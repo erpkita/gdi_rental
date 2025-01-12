@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_gdi_rental_root" name="GDI Rental" sequence="8">
+
+        <menuitem
+            id="menu_rental_quotation"
+            name="Rental Quotation"
+            action="gdi_rental.action_rental_quotation"
+            sequence="10"/>
+
+        <menuitem
+            id="menu_gdi_rental_order"
+            name="Rental Order"
+            action="action_gdi_rental_order"
+            sequence="20"/>
+
+    </menuitem>
+
+</odoo>

@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_rental_quotation_tree" model="ir.ui.view">
+        <field name="name">view.rental.quotation.tree</field>
+        <field name="model">rental.quotation</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="state in ['lock']" 
+                  decoration-info="state in ['draft', 'sent']" 
+                  decoration-danger="state == 'cancel'" 
+                  decoration-success="state == 'confirmed'"> 
+                <field name="name"/>
+                <field name="date_order"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="amount_total"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_rental_quotation_form" model="ir.ui.view">
+        <field name="name">view.rental.quotation.form</field>
+        <field name="model">rental.quotation</field>
+        <field name="arch" type="xml">
+            <form string="Rental Quotation" class="o_sale_order">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,sent,confirm,lock"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group name="rq_header">
+                        <group name="partner_details">
+                            <field name="partner_id" 
+                                   widget="res_partner_many2one" 
+                                   context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" 
+                                   options='{"always_reload": True}'/>
+                            <field 
+                                   name="partner_invoice_id" 
+                                   groups="sale.group_delivery_invoice_address" 
+                                   context="{'default_type':'invoice'}" 
+                                   options='{"always_reload": True}'
+                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
+                            <field name="partner_shipping_id" 
+                                   groups="sale.group_delivery_invoice_address" 
+                                   context="{'default_type':'delivery'}" 
+                                   options='{"always_reload": True}'
+                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                        </group>
+                        <group name="order_details">
+                            <field name="validity_date" attrs="{'invisible': [('state', 'in', ['confirm', 'lock', 'cancel'])]}"/>
+                            <field name="date_order" required="1"/>
+                            <label for="pricelist_id" groups="product.group_product_pricelist"/>
+                            <div groups="product.group_product_pricelist" class="o_row">
+                                <field name="pricelist_id" options="{'no_open':True,'no_create': True}"/>
+                                <!-- <button name="update_prices" type="object"
+                                    string=" Update Prices"
+                                    help="Recompute all prices based on this pricelist"
+                                    class="btn-link mb-1 px-0" icon="fa-refresh"
+                                    confirm="This will update all unit prices based on the currently set pricelist."
+                                    attrs="{'invisible': ['|', ('show_update_pricelist', '=', False), ('state', 'in', ['sale', 'done','cancel'])]}"/> -->
+                            </div>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="customer_reference"/>
+                            <field name="customer_po_number"/>
+                            <field name="company_id" 
+                                   options="{'no_create': True}" 
+                                   groups="base.group_multi_company"
+                                   invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Quotation Lines" name="quotation_lines">
+                            <field name="order_line"
+                                   widget="section_and_note_one2many"
+                                   attrs="{'readonly': [('state', 'in', ('confirm', 'cancel'))]}">
+                                <tree
+                                    string="Rental Quotation Lines"
+                                >
+                                    <control>
+                                        <create name="add_product_control" string="Add a product"/>
+                                    </control>
+
+                                    <field name="sequence" widget="handle" />
+                                    <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
+                                    <field name="product_uom_category_id" invisible="1"/>
+                                    <field name="item_type"/>
+                                    <field
+                                        name="product_id"
+                                        force_save="1"
+                                        context="{
+                                            'partner_id': parent.partner_id,
+                                            'quantity': product_uom_qty,
+                                            'pricelist': parent.pricelist_id,
+                                            'uom':product_uom,
+                                            'company_id': parent.company_id,
+                                            'default_lst_price': price_unit,
+                                            'default_description_sale': name
+                                        }"
+                                        domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
+                                        widget="product_configurator"
+                                        attrs="{
+                                            'required': [('item_type', '=', 'regular')]
+                                        }"
+                                    />
+
+                                    <field name="product_template_id"
+                                      string="Product"
+                                      invisible="1"
+                                      context="{
+                                          'partner_id': parent.partner_id,
+                                          'quantity': product_uom_qty,
+                                          'pricelist': parent.pricelist_id,
+                                          'uom':product_uom,
+                                          'company_id': parent.company_id,
+                                          'default_list_price': price_unit,
+                                          'default_description_sale': name
+                                      }"
+                                      domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
+                                      widget="product_configurator"/>
+                                    <field name="name" widget="section_and_note_text" required="1"/>
+                                    <field
+                                        name="product_uom_qty"
+                                        context="{
+                                            'partner_id': parent.partner_id,
+                                            'quantity': product_uom_qty,
+                                            'pricelist': parent.pricelist_id,
+                                            'uom': product_uom,
+                                            'company_id': parent.company_id
+                                        }"/>
+                                    <field
+                                        name="product_uom"
+                                        force_save="1"
+                                        string="UoM"
+                                        required="1"
+                                        context="{'company_id': parent.company_id}"
+                                        groups="uom.group_uom"
+                                        options='{"no_open": True}'
+                                        optional="show"
+                                    />
+                                    <field
+                                        name="price_unit"
+                                    />
+                                    <field
+                                        name="tax_id"
+                                        widget="many2many_tags"
+                                        options="{'no_create': True}"
+                                        domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
+                                        context="{'active_test': True}"
+                                        optional="show"
+                                    />
+                                    <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line" optional="show" widget="product_discount"/>
+                                    <field name="price_subtotal" widget="monetary" groups="account.group_show_line_subtotals_tax_excluded"/>
+                                    <field name="price_total" widget="monetary" groups="account.group_show_line_subtotals_tax_included"/>
+                                    <field name="state" invisible="1"/>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="price_tax" invisible="1"/>
+                                    <field name="company_id" invisible="1"/>
+                                </tree>
+                                <form>
+                                    <!--
+                                        We need the sequence field to be here for new lines to be added at the correct position.
+                                        TODO: at some point we want to fix this in the framework so that an invisible field is not required.
+                                    -->
+                                    <field name="sequence" invisible="1"/>
+                                    <field name="company_id" invisible="1"/>
+                                    <field name="product_uom_category_id" invisible="1"/>
+                                    <group col="4">
+
+                                        <group colspan="4" name="product_info">
+                                            <field name="item_type"/>
+                                            <field name="product_id"
+                                                domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
+                                                context="{
+                                                    'partner_id':parent.partner_id, 
+                                                    'quantity':product_uom_qty, 
+                                                    'pricelist':parent.pricelist_id, 
+                                                    'uom':product_uom, 
+                                                    'company_id': parent.company_id}"
+                                                attrs="{
+                                                    'required': [('item_type', '=', 'regular')],
+                                                }"
+                                                force_save="1"
+                                                widget="many2one_barcode"
+                                            />
+                                            <field name="name" string="Description"/>
+                                        </group> 
+
+                                        <group name="product_period" colspan="4">
+                                            <label for="start_date" string="Period"/>
+                                            <div class="o_row">
+                                                <field name="start_date" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
+                                                <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
+                                                <field name="end_date" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
+                                            </div>
+                                        </group>
+
+                                        <group colspan="2">
+                                            <field name="price_unit"/>
+                                            <label for="discount" groups="product.group_discount_per_so_line"/>
+                                            <div name="discount" groups="product.group_discount_per_so_line">
+                                                <field name="discount" class="oe_inline"/> %
+                                            </div>
+                                            <field name="tax_id" 
+                                                   widget="many2many_tags" 
+                                                   options="{'no_create': True}" 
+                                                   context="{'search_view_ref': 'account.account_tax_view_search'}" 
+                                                   domain="[
+                                                        ('type_tax_use','=','sale'), 
+                                                        ('company_id','=',parent.company_id)
+                                                    ]"/>
+                                        </group>
+
+                                        <group colspan="2">
+                                            <label for="product_uom_qty"/>
+                                            <div class="o_row" name="ordered_qty">
+                                                <field context="{
+                                                    'partner_id':parent.partner_id, 
+                                                    'quantity':product_uom_qty, 
+                                                    'pricelist':parent.pricelist_id, 
+                                                    'uom':product_uom, 
+                                                    'uom_qty_change':True, 
+                                                    'company_id': parent.company_id}" 
+                                                    name="product_uom_qty"/>
+                                                <field name="product_uom" 
+                                                       force_save="1" 
+                                                       groups="uom.group_uom" 
+                                                       class="oe_no_button"/>
+                                            </div>
+                                        </group>
+
+                                        <group colspan="4" string="Components" attrs="{'invisible': [('item_type', '=', 'regular')], 'required': [('item_type', '=', 'set')]}">
+                                            <field name="component_line_ids" nolabel="1">
+                                                <tree editable="bottom">
+                                                    <field name="product_uom_category_id" invisible="1"/>
+                                                    <field name="product_id"/>
+                                                    <field name="name"/>
+                                                    <field name="product_uom_qty"/>
+                                                    <field name="product_uom"/>
+                                                </tree>
+                                            </field>
+                                        </group>
+                                    </group>
+                                </form>
+                            </field>
+                            <group name="note_group" col="6" class="mt-2 mt-md-0">
+                                <group colspan="4">
+                                    <field name="note" class="oe-bordered-editor" nolabel="1" placeholder="Terms and conditions..."/>
+                                </group>
+                                <group class="oe_subtotal_footer oe_right" colspan="2" name="sale_total">
+                                    <field name="tax_totals_json" widget="account-tax-totals-field" nolabel="1" colspan="2"/>
+                                </group>
+                                <div class="oe_clear"/>
+                            </group>
+                        </page>
+                        <page string="Other Info" name="other_info">
+                            <group>
+                                <group>
+                                    <field name="fiscal_position_id"/>
+                                </group>
+                                <group></group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers" />
+                    <field name="message_ids" widget="mail_thread" />
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_rental_quotation" model="ir.actions.act_window">
+        <field name="name">Rental Quotation</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">rental.quotation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new quotation.
+            </p>
+        </field>
+    </record>
+
+</odoo>
