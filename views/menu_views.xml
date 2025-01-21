@@ -15,6 +15,25 @@
             action="action_gdi_rental_order"
             sequence="20"/>
 
+        <menuitem 
+            id="gdi_menu_rental_equipment"
+            name="Rental Equipment"
+            sequence="30">
+
+            <menuitem 
+                id="gdi_menu_rental_products" 
+                name="Products" 
+                sequence="1" 
+                action="gdi_rental.gdi_rental_product_template_action" />
+
+            <menuitem 
+                id="gdi_menu_rental_products_variant" 
+                name="Products Variant" 
+                sequence="2" 
+                action="gdi_rental.gdi_rental_product_product_action" />
+
+        </menuitem>
+
     </menuitem>
 
 </odoo>

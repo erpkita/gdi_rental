@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <data>
+    
+        <record id="gdi_rental_product_template_action" model="ir.actions.act_window">
+            <field name="name">Products</field>
+            <field name="res_model">product.template</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('rent_ok', '=', True)]</field>
+            <field name="context">{
+                'default_sale_ok': False,
+                'default_rent_ok': True,
+                'default_type': 'consu',
+                'default_purchase_ok': False,
+                'search_default_filter_to_rent': True,
+                }
+            </field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new rental product!
+                </p>
+                <p>
+                    You can also create additional products or services to sell by checking *Can be
+                    Sold* in the product form (e.g. insurance).
+                </p>
+            </field>
+        </record>
+
+        <record id="gdi_rental_product_product_action" model="ir.actions.act_window">
+            <field name="name">Product Variants</field>
+            <field name="res_model">product.product</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('rent_ok', '=', True)]</field>
+            <field name="context">{
+                'default_sale_ok': False,
+                'default_rent_ok': True,
+                'default_type': 'consu',
+                'default_purchase_ok': False,
+                'search_default_filter_to_rent': True,
+                }
+            </field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new rental product!
+                </p>
+                <p>
+                    You can also create additional products or services to sell by checking *Can be
+                    Sold* in the product form (e.g. insurance).
+                </p>
+            </field>
+        </record>
+
+    </data>
+
+</odoo>

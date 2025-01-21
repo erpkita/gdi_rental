@@ -107,6 +107,7 @@
                                         attrs="{
                                             'required': [('item_type', '=', 'regular')]
                                         }"
+                                        invisible="1"
                                     />
 
                                     <field name="product_template_id"
@@ -121,7 +122,7 @@
                                           'default_list_price': price_unit,
                                           'default_description_sale': name
                                       }"
-                                      domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
+                                      domain="[('rent_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
                                       widget="product_configurator"/>
                                     <field name="name" widget="section_and_note_text" required="1"/>
                                     <field
@@ -140,9 +141,9 @@
                                         required="1"
                                         context="{'company_id': parent.company_id}"
                                         groups="uom.group_uom"
-                                        options='{"no_open": True}'
-                                        optional="show"
+                                        optional="show" invisible="1"
                                     />
+                                    <field name="product_uom_txt" string="UoM"/>
                                     <field
                                         name="price_unit"
                                     />
@@ -172,10 +173,10 @@
                                     <field name="product_uom_category_id" invisible="1"/>
                                     <group col="4">
 
-                                        <group colspan="4" name="product_info">
+                                        <group colspan="4" name="product_info" string="Product Information">
                                             <field name="item_type"/>
                                             <field name="product_id"
-                                                domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
+                                                domain="[('rent_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
                                                 context="{
                                                     'partner_id':parent.partner_id, 
                                                     'quantity':product_uom_qty, 
@@ -184,6 +185,7 @@
                                                     'company_id': parent.company_id}"
                                                 attrs="{
                                                     'required': [('item_type', '=', 'regular')],
+                                                    'invisible': [('item_type', '=', 'set')]
                                                 }"
                                                 force_save="1"
                                                 widget="many2one_barcode"
@@ -191,7 +193,12 @@
                                             <field name="name" string="Description"/>
                                         </group> 
 
-                                        <group name="product_period" colspan="4">
+                                        <group name="product_period" colspan="2" string="Rental Duration">
+                                            <label for="duration"/>
+                                            <div class="o_row" name="duration_section">
+                                                <field name="duration"/>
+                                                <field name="duration_unit"/>
+                                            </div>
                                             <label for="start_date" string="Period"/>
                                             <div class="o_row">
                                                 <field name="start_date" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
@@ -199,9 +206,27 @@
                                                 <field name="end_date" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
                                             </div>
                                         </group>
-
-                                        <group colspan="2">
+                                        <group colspan="2" string="Price and Quantity">
+                                            <label for="product_uom_qty"/>
+                                            <div class="o_row" name="ordered_qty">
+                                                <field context="{
+                                                    'partner_id':parent.partner_id, 
+                                                    'quantity':product_uom_qty, 
+                                                    'pricelist':parent.pricelist_id, 
+                                                    'uom':product_uom, 
+                                                    'uom_qty_change':True, 
+                                                    'company_id': parent.company_id}" 
+                                                    name="product_uom_qty"/>
+                                                <field name="product_uom"
+                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'regular')]}"
+                                                       groups="uom.group_uom" 
+                                                       class="oe_no_button"/>
+                                                <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
+                                            </div>
                                             <field name="price_unit"/>
+                                        </group>
+
+                                        <group colspan="2" string="Taxes and Discounts">
                                             <label for="discount" groups="product.group_discount_per_so_line"/>
                                             <div name="discount" groups="product.group_discount_per_so_line">
                                                 <field name="discount" class="oe_inline"/> %
@@ -216,36 +241,66 @@
                                                     ]"/>
                                         </group>
 
-                                        <group colspan="2">
-                                            <label for="product_uom_qty"/>
-                                            <div class="o_row" name="ordered_qty">
-                                                <field context="{
-                                                    'partner_id':parent.partner_id, 
-                                                    'quantity':product_uom_qty, 
-                                                    'pricelist':parent.pricelist_id, 
-                                                    'uom':product_uom, 
-                                                    'uom_qty_change':True, 
-                                                    'company_id': parent.company_id}" 
-                                                    name="product_uom_qty"/>
-                                                <field name="product_uom" 
-                                                       force_save="1" 
-                                                       groups="uom.group_uom" 
-                                                       class="oe_no_button"/>
-                                            </div>
-                                        </group>
-
-                                        <group colspan="4" string="Components" attrs="{'invisible': [('item_type', '=', 'regular')], 'required': [('item_type', '=', 'set')]}">
-                                            <field name="component_line_ids" nolabel="1">
-                                                <tree editable="bottom">
-                                                    <field name="product_uom_category_id" invisible="1"/>
-                                                    <field name="product_id"/>
-                                                    <field name="name"/>
-                                                    <field name="product_uom_qty"/>
-                                                    <field name="product_uom"/>
-                                                </tree>
-                                            </field>
+                                        <group string="Total" colspan="2">
+                                            <field name="price_subtotal"/>
                                         </group>
                                     </group>
+                                    <notebook>
+                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'regular')]}">
+                                            <group col="4">
+                                                <field name="component_line_ids" colspan="4" nolabel="1" attrs="{'required': [('item_type', '=', 'set')]}">
+                                                    <tree>
+                                                        <field name="product_uom_category_id" invisible="1"/>
+                                                        <field name="product_id" invisible="1"/>
+                                                        <field name="name"/>
+                                                        <field name="product_uom_qty"/>
+                                                        <field name="product_uom"/>
+                                                        <field name="price_unit"/>
+                                                        <field name="price_subtotal" sum="Total Cost"/>
+                                                    </tree>
+                                                    <form string="Add Components">
+                                                        <group>
+                                                            <field name="product_uom_category_id" invisible="1"/>
+                                                            <group colspan="4" string="Product Info">
+                                                                <field name="product_id"/>
+                                                                <field name="name"/>
+                                                            </group>
+
+                                                            <group string="Rental Pricing and Quantity">
+                                                                <label for="quotation_duration"/>
+                                                                <div class="o_row" name="duration_section">
+                                                                    <field name="quotation_duration"/>
+                                                                    <field name="quotation_duration_unit"/>
+                                                                </div>
+                                                                <field name="price_unit"/>
+                                                                <label for="product_uom_qty"/>
+                                                                <div class="o_row" name="ordered_qty">
+                                                                    <field name="product_uom_qty"/>
+                                                                    <field name="product_uom"
+                                                                        force_save="1" 
+                                                                        groups="uom.group_uom" 
+                                                                        class="oe_no_button"/>
+                                                                </div>
+                                                            </group>
+                                                            
+                                                            <group string="Total">
+                                                                <field name="price_subtotal"/>
+                                                                <!-- <field name="available_src_location_ids" invisible="1"/>
+                                                                <field name="available_src_location_txt" readonly="1"/>
+                                                                <field name="src_location_id" domain="[('id', 'in', available_src_location_ids)]"/>
+                                                                <field name="available_qty"/>
+                                                                <field name="lot_id"/> -->
+                                                            </group>
+
+                                                            <group string="Stock Info" colspan="2">
+                                                                <field name="available_qty"/>
+                                                            </group>
+                                                        </group>
+                                                    </form>
+                                                </field>
+                                            </group>
+                                        </page>
+                                    </notebook>
                                 </form>
                             </field>
                             <group name="note_group" col="6" class="mt-2 mt-md-0">

@@ -120,6 +120,16 @@ class RentalQuotation(models.Model):
         ('cancel', 'Cancelled')
     ], default='draft')
 
+    @api.model
+    def create(self, vals):
+        if vals.get('name', _('New')) == _('New'):
+            seq_date = None
+            if 'date_order' in vals:
+                seq_date = fields.Datetime.context_timestamp(self, fields.Datetime.to_datetime(vals['date_order']))
+            vals['name'] = "RQ" + self.env['ir.sequence'].next_by_code('rental.quotation', sequence_date=seq_date) or _('New')        
+        result = super(RentalQuotation, self).create(vals)
+        return result
+
     def _compute_is_expired(self):
         today = fields.Date.today()
         for order in self:

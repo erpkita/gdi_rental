@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <data>
+    
+        <record id="gdi_rq_sequence" model="ir.sequence">
+            <field name="name">GDI RQ Sequence</field>
+            <field name="code">rental.quotation</field>
+            <field name="prefix">%(y)s%(month)s</field>
+            <field name="padding">4</field>
+        </record>
+
+    </data>
+
+</odoo>

@@ -45,6 +45,11 @@ class RentalOrderLine(models.Model):
     state = fields.Selection(
         related='order_id.state', string='Order Status', copy=False, store=True)
     
+    available_qty = fields.Float(string="Available Qty", compute="_get_available_qty")
+    src_location_id = fields.Many2one("stock.location", string="Source Location")
+    available_src_location_ids = fields.Many2many("stock.location", string="Src Location Ids", compute="_get_available_src_location")
+    available_src_location_txt = fields.Text("Available Src Location", compute="_get_available_src_location")    
+    
 
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
@@ -59,3 +64,49 @@ class RentalOrderLine(models.Model):
                 'price_total': taxes['total_included'],
                 'price_subtotal': taxes['total_excluded'],
             })
+
+    @api.depends('product_id', 'src_location_id')
+    def _get_available_qty(self):
+        for rec in self:
+            rec.available_qty = 0
+            if rec.product_id and rec.src_location_id:
+                quant_query = """
+                    SELECT SUM(quantity) AS total_qty FROM stock_quant
+                    WHERE location_id = %s AND product_id = %s 
+                """
+                self._cr.execute(quant_query, (rec.src_location_id.id, rec.product_id.id, ))
+                results = self._cr.dictfetchall()
+                if results:
+                    for stock in results:
+                        rec.available_qty = stock['total_qty']
+    
+    @api.depends('product_id')
+    def _get_available_src_location(self):
+        for rec in self:
+            if not rec.product_id:
+                rec.available_src_location_txt = '-'
+                rec.available_src_location_ids = False
+            else:
+                quant_query = """
+                    SELECT loc.id AS location_id, SUM(quant.quantity) AS total_qty FROM stock_quant AS quant, stock_location AS loc
+                    WHERE loc.usage = 'internal' AND
+                          quant.location_id = loc.id AND
+                          quant.quantity != 0.0 AND
+                          quant.product_id = %s GROUP BY loc.id
+                """
+                self._cr.execute(quant_query, (rec.product_id.id, ))
+                results = self._cr.dictfetchall()
+                rec.available_src_location_txt = 'N/A'
+                if len(results) > 0:
+                    avail_stock_qty_txt = ''
+                    location_ids = []
+                    for stock in results:
+                        location_id = self.env['stock.location'].browse(stock['location_id'])
+                        location_ids.append(location_id.id)
+                        availstock_location_text = '{} ({}) \n'.format(location_id.display_name, str(stock['total_qty']))
+                        avail_stock_qty_txt += availstock_location_text
+                    rec.available_src_location_txt = avail_stock_qty_txt
+                    rec.available_src_location_ids = self.env['stock.location'].browse(location_ids)
+                else:
+                    rec.available_src_location_txt = 'N/A'
+                    rec.available_src_location_ids = False
