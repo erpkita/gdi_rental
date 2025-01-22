@@ -120,6 +120,8 @@ class RentalQuotation(models.Model):
         ('cancel', 'Cancelled')
     ], default='draft')
 
+    rental_id = fields.Many2one("gdi.rental.order", string="Rental Order", readonly=True)
+
     @api.model
     def create(self, vals):
         if vals.get('name', _('New')) == _('New'):
@@ -198,3 +200,30 @@ class RentalQuotation(models.Model):
             values['user_id'] = user_id
 
         self.update(values)
+
+
+    def action_cancel(self):
+        for rec in self:
+            rec.write({
+                'state': 'Cancel'
+            })
+    
+    def action_print_quotation(self):
+        for rec in self:
+            if rec.state == 'draft':
+                rec.write({
+                    'state': 'sent'
+                })
+            return rec.env.ref('gdi_rental.gdi_action_report_rental_quotation').report_action(rec)
+    
+    def action_send_quotation(self):
+        for rec in self:
+            rec.write({
+                'state': 'sent'
+            })
+        
+    def action_confirm(self):
+        for rec in self:
+            if not rec.customer_reference or not rec.customer_po_number:
+                raise ValidationError(_("Please input Customer Reference and Customer Ref. PO !"))
+        

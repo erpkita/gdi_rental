@@ -26,6 +26,8 @@
     'data': [
         'security/ir.model.access.csv',
         'data/gdi_rental_sequence.xml',
+        'report/rental_quotation_templates.xml',
+        'report/rental_reports.xml',
         'views/product_views.xml',
         'views/rental_quotation_views.xml',
         'views/rental_order_views.xml',

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <data>
+        <record id="gdi_action_report_rental_quotation" model="ir.actions.report">
+            <field name="name">Rental Quotation</field>
+            <field name="model">rental.quotation</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">gdi_rental.report_rental_quotation</field>
+            <field name="report_file">gdi_rental.report_rental_quotation</field>
+            <field name="print_report_name">'Rental Quotation (%s)' % (object.name)</field>
+            <field name="binding_model_id" ref="model_rental_quotation"/>
+            <field name="binding_type">report</field>
+        </record>
+    </data>
+
+</odoo>

@@ -59,7 +59,7 @@ class RentalQuotationLine(models.Model):
         ('month', 'Months')
     ], string="Unit", default='day', required=True)
 
-    component_line_ids = fields.One2many("rental.order.component", 
+    component_line_ids = fields.One2many("rental.quotation.component", 
                                          "quotation_line_id", 
                                          string="Components")
 
@@ -116,7 +116,7 @@ class RentalQuotationLine(models.Model):
         vals = {}
         if not self.product_id:
             vals['product_uom'] = False
-            vals['product_uom_qty'] = 0.0
+            vals['product_uom_qty'] = 1.0
             vals['price_unit'] = 0.0
             vals['product_uom_txt'] = "SET"
             self.update(vals)

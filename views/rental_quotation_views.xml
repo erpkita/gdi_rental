@@ -25,6 +25,10 @@
         <field name="arch" type="xml">
             <form string="Rental Quotation" class="o_sale_order">
                 <header>
+                    <button name="action_send_quotation" states="draft" type="object" string="Send Quotation" class="oe_highlight"/>
+                    <button name="action_print_quotation" states="draft,sent,confirm" type="object" string="Print Quotation" class="oe_highlight"/>
+                    <button name="action_confirm" states="sent" type="object" string="Confirm and Make Order" class="oe_highlight"/>
+                    <button name="action_cancel" states="draft,sent" type="object" string="Cancel"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,sent,confirm,lock"/>
                 </header>
                 <sheet>
@@ -36,16 +40,19 @@
                     <group name="rq_header">
                         <group name="partner_details">
                             <field name="partner_id" 
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"
                                    widget="res_partner_many2one" 
                                    context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" 
                                    options='{"always_reload": True}'/>
                             <field 
                                    name="partner_invoice_id" 
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"
                                    groups="sale.group_delivery_invoice_address" 
                                    context="{'default_type':'invoice'}" 
                                    options='{"always_reload": True}'
                                    domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
                             <field name="partner_shipping_id" 
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"
                                    groups="sale.group_delivery_invoice_address" 
                                    context="{'default_type':'delivery'}" 
                                    options='{"always_reload": True}'
@@ -53,11 +60,11 @@
                             <field name="user_id" widget="many2one_avatar_user"/>
                         </group>
                         <group name="order_details">
-                            <field name="validity_date" attrs="{'invisible': [('state', 'in', ['confirm', 'lock', 'cancel'])]}"/>
-                            <field name="date_order" required="1"/>
+                            <field name="validity_date" attrs="{'invisible': [('state', 'in', ['confirm', 'lock', 'cancel'])], 'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
+                            <field name="date_order" required="1" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
                             <label for="pricelist_id" groups="product.group_product_pricelist"/>
                             <div groups="product.group_product_pricelist" class="o_row">
-                                <field name="pricelist_id" options="{'no_open':True,'no_create': True}"/>
+                                <field name="pricelist_id" options="{'no_open':True,'no_create': True}" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
                                 <!-- <button name="update_prices" type="object"
                                     string=" Update Prices"
                                     help="Recompute all prices based on this pricelist"
@@ -66,8 +73,8 @@
                                     attrs="{'invisible': ['|', ('show_update_pricelist', '=', False), ('state', 'in', ['sale', 'done','cancel'])]}"/> -->
                             </div>
                             <field name="currency_id" invisible="1"/>
-                            <field name="customer_reference"/>
-                            <field name="customer_po_number"/>
+                            <field name="customer_reference" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
+                            <field name="customer_po_number" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
                             <field name="company_id" 
                                    options="{'no_create': True}" 
                                    groups="base.group_multi_company"
@@ -78,7 +85,7 @@
                         <page string="Quotation Lines" name="quotation_lines">
                             <field name="order_line"
                                    widget="section_and_note_one2many"
-                                   attrs="{'readonly': [('state', 'in', ('confirm', 'cancel'))]}">
+                                   attrs="{'readonly': [('state', 'in', ('confirm', 'cancel', 'lock'))]}">
                                 <tree
                                     string="Rental Quotation Lines"
                                 >
@@ -305,7 +312,7 @@
                             </field>
                             <group name="note_group" col="6" class="mt-2 mt-md-0">
                                 <group colspan="4">
-                                    <field name="note" class="oe-bordered-editor" nolabel="1" placeholder="Terms and conditions..."/>
+                                    <field name="note" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}" class="oe-bordered-editor" nolabel="1" placeholder="Terms and conditions..."/>
                                 </group>
                                 <group class="oe_subtotal_footer oe_right" colspan="2" name="sale_total">
                                     <field name="tax_totals_json" widget="account-tax-totals-field" nolabel="1" colspan="2"/>
@@ -316,7 +323,7 @@
                         <page string="Other Info" name="other_info">
                             <group>
                                 <group>
-                                    <field name="fiscal_position_id"/>
+                                    <field name="fiscal_position_id" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
                                 </group>
                                 <group></group>
                             </group>
