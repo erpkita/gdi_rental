@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import json
 from datetime import datetime, timedelta
 
 from odoo import models, fields, api, _
@@ -10,6 +10,22 @@ class GdiRentalOrder(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "GDI Rental Order"
     _order = 'date_order, id desc'
+
+    @api.depends('order_line.price_total')
+    def _amount_all(self):
+        """
+        Compute the total amounts of the RQ.
+        """
+        for order in self:
+            amount_untaxed = amount_tax = 0.0
+            for line in order.order_line:
+                amount_untaxed += line.price_subtotal
+                amount_tax += line.price_tax
+            order.update({
+                'amount_untaxed': amount_untaxed,
+                'amount_tax': amount_tax,
+                'amount_total': amount_untaxed + amount_tax,
+            })
 
     name = fields.Char(string="RO Reference", 
                        require=True, copy=False, readonly=True, index=True, 
@@ -79,7 +95,7 @@ class GdiRentalOrder(models.Model):
                                  compute='_compute_currency_rate', store=True, 
                                  digits=(12, 6), 
                                  help='The rate of the currency to the currency of rate 1 applicable at the date of the order')
-
+    note = fields.Html('Terms and conditions')
     state = fields.Selection([
         ('confirm', 'Confirmed'),
         ('ongoing', 'Ongoing'),
@@ -133,6 +149,30 @@ class GdiRentalOrder(models.Model):
             values['user_id'] = user_id
 
         self.update(values)
+
+    @api.depends('order_line.tax_id', 'order_line.price_unit', 'amount_total', 'amount_untaxed')
+    def _compute_tax_totals_json(self):
+        def compute_taxes(order_line):
+            price = order_line.price_unit * (1 - (order_line.discount or 0.0) / 100.0)
+            order = order_line.order_id
+            return order_line.tax_id._origin.compute_all(price, order.currency_id, order_line.product_uom_qty, product=order_line.product_id, partner=order.partner_shipping_id)
+
+        account_move = self.env['account.move']
+        for order in self:
+            tax_lines_data = account_move._prepare_tax_lines_data_for_totals_from_object(order.order_line, compute_taxes)
+            tax_totals = account_move._get_tax_totals(order.partner_id, tax_lines_data, order.amount_total, order.amount_untaxed, order.currency_id)
+            order.tax_totals_json = json.dumps(tax_totals)
+
+    @api.depends('pricelist_id', 'date_order', 'company_id')
+    def _compute_currency_rate(self):
+        for order in self:
+            if not order.company_id:
+                order.currency_rate = order.currency_id.with_context(date=order.date_order).rate or 1.0
+                continue
+            elif order.company_id.currency_id and order.currency_id:  # the following crashes if any one is undefined
+                order.currency_rate = self.env['res.currency']._get_conversion_rate(order.company_id.currency_id, order.currency_id, order.company_id, order.date_order)
+            else:
+                order.currency_rate = 1.0
 
     def action_cancel(self):
         pass

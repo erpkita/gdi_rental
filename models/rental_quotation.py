@@ -158,6 +158,17 @@ class RentalQuotation(models.Model):
             else:
                 record.tax_country_id = record.company_id.account_fiscal_country_id
 
+    @api.depends('pricelist_id', 'date_order', 'company_id')
+    def _compute_currency_rate(self):
+        for order in self:
+            if not order.company_id:
+                order.currency_rate = order.currency_id.with_context(date=order.date_order).rate or 1.0
+                continue
+            elif order.company_id.currency_id and order.currency_id:  # the following crashes if any one is undefined
+                order.currency_rate = self.env['res.currency']._get_conversion_rate(order.company_id.currency_id, order.currency_id, order.company_id, order.date_order)
+            else:
+                order.currency_rate = 1.0
+
     @api.onchange('partner_shipping_id', 'partner_id', 'company_id')
     def onchange_partner_shipping_id(self):
         """
@@ -221,9 +232,77 @@ class RentalQuotation(models.Model):
             rec.write({
                 'state': 'sent'
             })
+
+    def _prepare_rental_order(self):
+        partner = self.partner_id
+        order_vals = {
+            'partner_id': partner.id or False,
+            'partner_invoice_id': self.partner_invoice_id.id or False,
+            'partner_shipping_id': self.partner_shipping_id.id or False,
+            'pricelist_id': self.pricelist_id.id or False,
+            'customer_reference': self.customer_reference or False,
+            'customer_po_number': self.customer_po_number or False,
+            'user_id': self.user_id.id or False,
+            'quotation_id': self.id or False,
+            'company_id': self.company_id.id or False,
+            'note': self.note or False,
+            'date_order': self.date_order,
+            'currency_id': self.currency_id.id or False,
+            'order_line' : [],
+            'fiscal_position_id': self.fiscal_position_id.id
+        }
+
+        return order_vals
+    
+    def _prepare_rental_order_line(self, line):
+        orderline_vals = {
+            'name': line.name,
+            'item_type': line.item_type,
+            'product_id': line.product_id.id or False,
+            'product_uom': line.product_uom.id or False,
+            'product_uom_qty': line.product_uom_qty,
+            'price_unit': line.price_unit,
+            'tax_id' : line.tax_id.ids or False,
+            'duration': line.duration,
+            'duration_unit': line.duration_unit
+        }
+        if line.item_type == 'set':
+            component_records = []
+            for rec in line.component_line_ids:
+                component_records.append((0, 0, {
+                    'product_id': rec.product_id.id or False,
+                    'name': rec.name or False,
+                    'price_unit': rec.price_unit or 0.0,
+                    'product_uom_qty': rec.product_uom_qty or 0.0,
+                    'product_uom': rec.product_uom.id
+                }))
+
+            orderline_vals.update({'component_line_ids': component_records})
+
+        return orderline_vals
         
     def action_confirm(self):
         for rec in self:
             if not rec.customer_reference or not rec.customer_po_number:
-                raise ValidationError(_("Please input Customer Reference and Customer Ref. PO !"))
+                raise ValidationError(_("Please input Customer Reference and Customer Ref. PO !"))            
+            order_vals = self._prepare_rental_order()
+            rental_id = self.env['gdi.rental.order'].create(order_vals)
+            for line in rec.order_line:
+                orderline_values = self._prepare_rental_order_line(line)
+                orderline_values.update({'order_id': rental_id.id})
+                rec.env['gdi.rental.order.line'].create(orderline_values)
+            
+            rec.write({'state': 'confirm'})
+            return rec.action_view_rental_orders(rental_id)
+            
+    def action_view_rental_orders(self, rental_id):
+        action = self.env['ir.actions.actions']._for_xml_id("gdi_rental.action_gdi_rental_order")
+        form_view = [(self.env.ref('gdi_rental.view_gdi_rental_order_form').id, 'form')]
+        if 'views' in action:
+            action['views'] = form_view + [(state,view) for state,view in action['views'] if view != 'form']
+        else:
+            action['views'] = form_view
+        action['res_id'] = rental_id.id
+
         
+        return action
