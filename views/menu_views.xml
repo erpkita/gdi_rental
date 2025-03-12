@@ -16,9 +16,16 @@
             sequence="20"/>
 
         <menuitem 
+            id="menu_gdi_rental_contract"
+            name="Contracts"
+            action="action_gdi_rental_contracts_view"
+            sequence="30"
+        />
+
+        <menuitem 
             id="gdi_menu_rental_equipment"
             name="Rental Equipment"
-            sequence="30">
+            sequence="40">
 
             <menuitem 
                 id="gdi_menu_rental_products" 

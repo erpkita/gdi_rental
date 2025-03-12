@@ -1,7 +1,11 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_rental_contract_all,rental.contract all,model_rental_contract,,1,1,1,1
+access_rental_contract_line_all,rental.contract.line all,model_rental_contract_line,,1,1,1,1
 access_rental_quotation_all,rental.quotation all,model_rental_quotation,,1,1,1,1
 access_rental_quotation_line_all,rental.quotation.line all,model_rental_quotation_line,,1,1,1,1
 access_gdi_rental_order_all,gdi.rental.order all,model_gdi_rental_order,,1,1,1,1
 access_gdi_rental_order_line_all,gdi.rental.order.line all,model_gdi_rental_order_line,,1,1,1,1
 access_rental_order_component_all,rental.order.compoonent all,model_rental_order_component,,1,1,1,1
 access_rental_quotation_component_all,rental.quotation.component all,model_rental_quotation_component,,1,1,1,1
+access_rental_contract_component_all,rental.contract.component all,model_rental_contract_component,,1,1,1,1
+access_rental_contract_creation_wizard_all,rental.contract.creation.wizard all,model_rental_contract_creation_wizard,,1,1,1,1

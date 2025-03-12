@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="gdi_rental_contract_creation_wizard_form_view" model="ir.ui.view">
+        <field name="name">gdi.rental.contract.creation.wizard.form.view</field>
+        <field name="model">rental.contract.creation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create Rental Contract">
+                <group>
+                    <group>
+                        <field name="rental_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="date_definition_level" required="1" string="Date Definition Lvl."/>
+                    </group>
+                </group>
+              <footer>
+                  <button string="Create" type="object" name="action_create_contract" class="btn-primary"/>
+                  <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_rental_contract_creation_wizard" model="ir.actions.act_window">
+        <field name="name">Create Rental Contract</field>
+        <field name="res_model">rental.contract.creation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="gdi_rental_contract_creation_wizard_form_view"/>
+    </record>
+
+</odoo>

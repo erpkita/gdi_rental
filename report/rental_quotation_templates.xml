@@ -106,7 +106,7 @@
                                     </t>
                                 </t>
                                 <t t-else="">
-                                    <td>-</td>
+                                    <td><span t-field="line.item_code"/></td>
                                 </t>
 
                                 <td name="td_name"><span t-field="line.name"/></td>

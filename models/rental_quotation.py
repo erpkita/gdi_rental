@@ -258,9 +258,11 @@ class RentalQuotation(models.Model):
         orderline_vals = {
             'name': line.name,
             'item_type': line.item_type,
+            'item_code': line.item_code,
             'product_id': line.product_id.id or False,
             'product_uom': line.product_uom.id or False,
             'product_uom_qty': line.product_uom_qty,
+            'product_uom_txt': line.product_uom_txt or "",
             'price_unit': line.price_unit,
             'tax_id' : line.tax_id.ids or False,
             'duration': line.duration,

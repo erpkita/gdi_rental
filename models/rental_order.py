@@ -105,6 +105,15 @@ class GdiRentalOrder(models.Model):
 
     quotation_id = fields.Many2one("rental.quotation", string="Quotation", readonly=True)
 
+    date_definition_level = fields.Selection([
+        ('order', 'Rental Order Level'),
+        ('item', 'Rental Order Item Level')
+    ], string="Date Definition Level", default='order', required=True,
+       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level.")
+
+    start_date = fields.Datetime(string="Start Date")
+    end_date = fields.Datetime(string="End Date")
+
     @api.model
     def create(self, vals):
         if vals.get('name', _('New')) == _('New'):
@@ -173,6 +182,105 @@ class GdiRentalOrder(models.Model):
                 order.currency_rate = self.env['res.currency']._get_conversion_rate(order.company_id.currency_id, order.currency_id, order.company_id, order.date_order)
             else:
                 order.currency_rate = 1.0
+    
+    def _order_check_rental_period(self):
+        for rec in self:
+            if not rec.start_date:
+                raise ValidationError(_(f"Rental period start date is not defined. Please define it before starting the rental."))
+            if not rec.end_date:
+                raise ValidationError(_(f"Rental period end date is not defined. Please define it before starting the rental."))            
+
+    def action_view_rental_contract(self, contract_id):
+        action = self.env['ir.actions.actions']._for_xml_id("gdi_rental.action_gdi_rental_contracts_view")
+        form_view = [(self.env.ref('gdi_rental.view_gdi_rental_contract_tree_form').id, 'form')]
+        if 'views' in action:
+            action['views'] = form_view + [(state,view) for state,view in action['views'] if view != 'form']
+        else:
+            action['views'] = form_view
+        action['res_id'] = contract_id.id
+
+        return action
+
+    def action_generate_contract(self):
+        for rec in self:
+            if rec.date_definition_level == "order":
+                rec._order_check_rental_period()
+            else:
+                for line in rec.order_line:
+                    line.check_rental_period()
+            
+            contract_id = self.env["rental.contract"].create(rec._prepare_contract_vals())
+            for line in rec.order_line:
+                contract_line_values = self._prepare_contract_line(line)
+                contract_line_values.update({'contract_id': contract_id.id})
+                self.env["rental.contract.line"].create(contract_line_values)
+            
+            rec.write({'state': 'ongoing'})
+            # return rec.action_view_rental_contract(contract_id)
+            return contract_id
+    
+    def _prepare_contract_vals(self):
+        partner = self.partner_id
+        contract_vals = {
+            'partner_id': partner.id or False,
+            'pricelist_id': self.pricelist_id.id or False,
+            'customer_reference': self.customer_reference or False,
+            'customer_po_number': self.customer_po_number or False,
+            'user_id': self.user_id.id or False,
+            'order_id': self.id or False,
+            'company_id': self.company_id.id or False,
+            # 'date_definition_level': self.date_definition_level or False,
+            # 'start_date': self.start_date or False,
+            # 'end_date': self.end_date or False,
+            'currency_id': self.currency_id.id or False,
+            'contract_line_ids' : [],
+            'fiscal_position_id': self.fiscal_position_id.id
+        }
+
+        return contract_vals
+
+    def _prepare_contract_line(self, line):
+        contract_line_vals = {
+            'name': line.name,
+            'item_type': line.item_type,
+            'item_code': line.item_code,
+            'product_id': line.product_id.id or False,
+            'product_uom': line.product_uom.id or False,
+            'product_uom_qty': line.product_uom_qty,
+            'product_uom_txt': line.product_uom_txt or "",
+            'price_unit': line.price_unit,
+            'tax_id' : line.tax_id.ids or False,
+            'duration': line.duration,
+            # 'date_definition_level': line.date_definition_level or False,
+            # 'start_date': line.start_date or False,
+            # 'end_date': line.end_date or False,
+            'duration_unit': line.duration_unit
+        }
+        if line.item_type == 'set':
+            component_records = []
+            for rec in line.component_line_ids:
+                component_records.append((0, 0, {
+                    'product_id': rec.product_id.id or False,
+                    'name': rec.name or False,
+                    'price_unit': rec.price_unit or 0.0,
+                    'product_uom_qty': rec.product_uom_qty or 0.0,
+                    'product_uom': rec.product_uom.id
+                }))
+
+            contract_line_vals.update({'component_line_ids': component_records})
+        return contract_line_vals
+                
+    def action_create_contract(self): 
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'rental.contract.creation.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref('gdi_rental.gdi_rental_contract_creation_wizard_form_view').id,
+            'target': 'new',
+            'context': {
+                'default_rental_id': self.id,
+            }
+        }
 
     def action_cancel(self):
         pass
@@ -181,7 +289,9 @@ class GdiRentalOrder(models.Model):
         pass
     
     def action_start_rental(self):
-        pass
+        for rec in self:
+            for line in rec.order_line:
+                line.check_rental_period()
 
     def action_hireoff(self):
         pass

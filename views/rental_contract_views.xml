@@ -1,37 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="view_gdi_rental_order_tree" model="ir.ui.view">
-        <field name="name">view.gdi.rental.order.tree</field>
-        <field name="model">gdi.rental.order</field>
+    <record id="view_gdi_rental_contract_tree_view" model="ir.ui.view">
+        <field name="name">view.gdi.rental.contract.tree</field>
+        <field name="model">rental.contract</field>
         <field name="arch" type="xml">
-            <tree decoration-muted="state in ['hireoff']" 
-                  decoration-info="state in ['confirm']" 
-                  decoration-danger="state == 'cancel'" 
-                  decoration-success="state == 'ongoing'"> 
+            <tree string="Rental Contracts"> 
                 <field name="name"/>
-                <field name="date_order"/>
+                <field name="order_id"/>
                 <field name="partner_id"/>
-                <field name="user_id"/>
-                <field name="amount_total"/>
-                <field name="state"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
             </tree>
         </field>
     </record>
 
-    <record id="view_gdi_rental_order_form" model="ir.ui.view">
-        <field name="name">view.gdi.rental.order.form</field>
-        <field name="model">gdi.rental.order</field>
+    <record id="view_gdi_rental_contract_tree_form" model="ir.ui.view">
+        <field name="name">view.gdi.rental.contract.form</field>
+        <field name="model">rental.contract</field>
         <field name="arch" type="xml">
-            <form string="Rental Order" class="o_sale_order">
+            <form string="Rental Contracts" class="o_sale_order">
+                <field name="company_id" invisible="1"/>
                 <header>
-                    <!-- <button name="action_start_rental" states="confirm" string="Start Rental" type="object" class="oe_highlight"/> -->
-                    <button name="action_generate_contract" states="confirm" string="Generate Contract" type="object" class="oe_highlight"/>
-                    <button name="action_create_contract" type="object" string="Create Contract" states="confirm,ongoing" class="btn-primary"/>
-                    <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="oe_highlight"/>
-                    <button name="action_hireoff" states="ongoing" string="Hire off" type="object" class="oe_highlight"/>
-                    <button name="action_cancel" states="confirm" string="cancel" type="object"/>
-                    <field name="state" widget="statusbar" statusbar_visible="confirm,ongoing,hireoff"/>
+                    <button name="create_do" type="object" string="Create DO" class="oe_highlight"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -44,62 +35,35 @@
                             <field name="partner_id" 
                                    widget="res_partner_many2one" 
                                    context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" 
-                                   options='{"always_reload": True}'/>
-                            <field 
-                                   name="partner_invoice_id" 
-                                   groups="sale.group_delivery_invoice_address" 
-                                   context="{'default_type':'invoice'}" 
-                                   options='{"always_reload": True}'
-                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
-                            <field name="partner_shipping_id" 
-                                   groups="sale.group_delivery_invoice_address" 
-                                   context="{'default_type':'delivery'}" 
-                                   options='{"always_reload": True}'
-                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
-                            <field name="user_id" widget="many2one_avatar_user"/>
+                                   options='{"always_reload": True}'/> 
+                            <field name="user_id"/>
                         </group>
                         <group name="order_details">
-                            <field name="date_order" required="1"/>
-                            <label for="pricelist_id" groups="product.group_product_pricelist"/>
-                            <div groups="product.group_product_pricelist" class="o_row">
-                                <field name="pricelist_id" options="{'no_open':True,'no_create': True}"/>
-                                <!-- <button name="update_prices" type="object"
-                                    string=" Update Prices"
-                                    help="Recompute all prices based on this pricelist"
-                                    class="btn-link mb-1 px-0" icon="fa-refresh"
-                                    confirm="This will update all unit prices based on the currently set pricelist."
-                                    attrs="{'invisible': ['|', ('show_update_pricelist', '=', False), ('state', 'in', ['sale', 'done','cancel'])]}"/> -->
-                            </div>
-                            <field name="currency_id" invisible="1"/>
-                            <field name="customer_reference"/>
-                            <field name="customer_po_number"/>
-                            <field name="company_id" 
-                                   options="{'no_create': True}" 
-                                   groups="base.group_multi_company"
-                                   invisible="1"/>
-                            <!-- <field name="date_definition_level" string="Date Definition Lvl."/>
+                            <field name="order_id"/>
+                            <field name="create_date"/>
+                            <field name="date_definition_level" string="Date Definition Lvl."/>
                             <label for="start_date" string="Rental Period" attrs="{'invisible': [('date_definition_level', '=', 'item')]}"/>
                             <div class="o_row" attrs="{'invisible': [('date_definition_level', '=', 'item')]}">
                                 <field name="start_date" attrs="{'required': [('date_definition_level', '=', 'order')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
                                 <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'order')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
-                            </div> -->
+                                <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'order')]}"  widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
+                            </div>
+                            <field name="customer_reference" string="Customer Ref." invisible="1"/>
+                            <field name="customer_po_number" invisible="1"/>
+                            <field name="pricelist_id" invisible="1"/>
                         </group>
                     </group>
                     <notebook>
-                        <page string="Order Lines" name="order_lines">
-                            <field name="order_line"
-                                   widget="section_and_note_one2many"
-                                   attrs="{'readonly': [('state', 'in', ('ongoing', 'hireoff', 'cancel'))]}">
+                        <page string="Rental Items" name="rental_items">
+                            <field name="contract_line_ids"
+                                   widget="section_and_note_one2many">
                                 <tree
-                                    string="Rental Order Lines"
-                                >
+                                    string="Rental Order Lines">
                                     <control>
                                         <create name="add_product_control" string="Add a product"/>
                                     </control>
 
                                     <field name="sequence" widget="handle" />
-                                    <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
                                     <field name="product_uom_category_id" invisible="1"/>
                                     <field name="item_type"/>
                                     <field name="item_code"/>
@@ -157,27 +121,9 @@
                                     <field
                                         name="price_unit"
                                     />
-                                    <field
-                                        name="tax_id"
-                                        widget="many2many_tags"
-                                        options="{'no_create': True}"
-                                        domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
-                                        context="{'active_test': True}"
-                                        optional="show"
-                                    />
-                                    <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line" optional="show" widget="product_discount"/>
-                                    <field name="price_subtotal" widget="monetary" groups="account.group_show_line_subtotals_tax_excluded"/>
-                                    <field name="price_total" widget="monetary" groups="account.group_show_line_subtotals_tax_included"/>
-                                    <field name="state" invisible="1"/>
-                                    <field name="currency_id" invisible="1"/>
-                                    <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
                                 </tree>
                                 <form>
-                                    <!--
-                                        We need the sequence field to be here for new lines to be added at the correct position.
-                                        TODO: at some point we want to fix this in the framework so that an invisible field is not required.
-                                    -->
                                     <field name="sequence" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
                                     <field name="product_uom_category_id" invisible="1"/>
@@ -204,18 +150,18 @@
                                         </group> 
 
                                         <group name="product_period" colspan="2" string="Rental Duration">
-                                            <!-- <field name="date_definition_level" invisible="1"/> -->
+                                            <field name="date_definition_level" invisible="1"/>
                                             <label for="duration"/>
                                             <div class="o_row" name="duration_section">
                                                 <field name="duration"/>
                                                 <field name="duration_unit"/>
                                             </div>
-                                            <!-- <label for="start_date" string="Period" attrs="{'invisible': [('date_definition_level', '=', 'order')]}"/>
+                                            <label for="start_date" string="Period" attrs="{'invisible': [('date_definition_level', '=', 'order')]}"/>
                                             <div class="o_row" attrs="{'invisible': [('date_definition_level', '=', 'order')]}">
                                                 <field name="start_date" attrs="{'required': [('date_definition_level', '=', 'item')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
                                                 <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
                                                 <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'item')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
-                                            </div> -->
+                                            </div>
                                         </group>
                                         <group colspan="2" string="Price and Quantity">
                                             <label for="product_uom_qty"/>
@@ -242,14 +188,6 @@
                                             <div name="discount" groups="product.group_discount_per_so_line">
                                                 <field name="discount" class="oe_inline"/> %
                                             </div>
-                                            <field name="tax_id" 
-                                                   widget="many2many_tags" 
-                                                   options="{'no_create': True}" 
-                                                   context="{'search_view_ref': 'account.account_tax_view_search'}" 
-                                                   domain="[
-                                                        ('type_tax_use','=','sale'), 
-                                                        ('company_id','=',parent.company_id)
-                                                    ]"/>
                                         </group>
 
                                         <group string="Total" colspan="2">
@@ -296,14 +234,15 @@
                                                             
                                                             <group string="Total">
                                                                 <field name="price_subtotal"/>
+                                                                <!-- <field name="available_src_location_ids" invisible="1"/>
+                                                                <field name="available_src_location_txt" readonly="1"/>
+                                                                <field name="src_location_id" domain="[('id', 'in', available_src_location_ids)]"/>
+                                                                <field name="available_qty"/>
+                                                                <field name="lot_id"/> -->
                                                             </group>
 
-                                                            <group string="Availability Info" colspan="2">
+                                                            <group string="Stock Info" colspan="2">
                                                                 <field name="available_qty"/>
-                                                                <field name="available_src_location_ids" invisible="1"/>
-                                                                <field name="available_src_location_txt" readonly="1" string="Available Src. Loc."/>
-                                                                <field name="src_location_id" domain="[('id', 'in', available_src_location_ids)]"/>
-                                                                <field name="lot_id"/>
                                                             </group>
                                                         </group>
                                                     </form>
@@ -313,25 +252,6 @@
                                     </notebook>
                                 </form>
                             </field>
-                            <group name="note_group" col="6" class="mt-2 mt-md-0">
-                                <group colspan="4">
-                                    <field name="note" attrs="{'readonly': [('state', 'in', ['cancel'])]}" class="oe-bordered-editor" nolabel="1" placeholder="Terms and conditions..."/>
-                                </group>
-                                <group class="oe_subtotal_footer oe_right" colspan="2" name="sale_total">
-                                    <field name="tax_totals_json" widget="account-tax-totals-field" nolabel="1" colspan="2"/>
-                                </group>
-                                <div class="oe_clear"/>
-                            </group>
-                        </page>
-                        <page string="Other Info" name="other_info">
-                            <group>
-                                <group string="Finance">
-                                    <field name="fiscal_position_id"/>
-                                </group>
-                                <group string="Reference">
-                                    <field name="quotation_id"/>
-                                </group>
-                            </group>
                         </page>
                     </notebook>
                 </sheet>
@@ -343,14 +263,14 @@
         </field>
     </record>
 
-    <record id="action_gdi_rental_order" model="ir.actions.act_window">
-        <field name="name">Rental Order</field>
+    <record id="action_gdi_rental_contracts_view" model="ir.actions.act_window">
+        <field name="name">Rental Contract</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">gdi.rental.order</field>
+        <field name="res_model">rental.contract</field>
         <field name="view_mode">tree,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Create a new rental order.
+                Create a new rental contract.
             </p>
         </field>
     </record>

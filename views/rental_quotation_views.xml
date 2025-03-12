@@ -97,6 +97,7 @@
                                     <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
                                     <field name="product_uom_category_id" invisible="1"/>
                                     <field name="item_type"/>
+                                    <field name="item_code"/>
                                     <field
                                         name="product_id"
                                         force_save="1"
@@ -198,6 +199,7 @@
                                                 widget="many2one_barcode"
                                             />
                                             <field name="name" string="Description"/>
+                                            <field name="item_code" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
                                         </group> 
 
                                         <group name="product_period" colspan="2" string="Rental Duration">

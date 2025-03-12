@@ -4,7 +4,7 @@
 from datetime import timedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import get_lang
 
 class RentalOrderLine(models.Model):
@@ -16,7 +16,7 @@ class RentalOrderLine(models.Model):
                                    ondelete='cascade', index=True, copy=False)
     name = fields.Text(string='Description', required=True)
     sequence = fields.Integer(string='Sequence', default=10)
-
+    item_code = fields.Char(string="Item Code", required=True)
     product_id = fields.Many2one('product.product', string='Product', 
                                  domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
                                  change_default=True, ondelete='restrict')  # Unrequired company
@@ -48,6 +48,11 @@ class RentalOrderLine(models.Model):
         related='order_id.state', string='Order Status', copy=False, store=True)
     
     item_type = fields.Selection([('regular', 'Regular'), ('set', 'Set')], default='regular', string="Type", required=True)
+    date_definition_level = fields.Selection(
+        related="order_id.date_definition_level", string="Date Definition Level",
+       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level."
+    )
+
     start_date = fields.Date(string="Start Date", required=False)
     end_date = fields.Date(string="End Date", required=False)
 
@@ -208,3 +213,15 @@ class RentalOrderLine(models.Model):
             rec.update({
                 'price_unit': total_price_unit
             })
+
+    def check_rental_period(self):
+        for rec in self:
+            if not rec.start_date:
+                raise ValidationError(_(f"Rental period start date for item code {rec.item_code} is not defined. Please define it before starting the rental."))
+            if not rec.end_date:
+                raise ValidationError(_(f"Rental period end date for item code {rec.item_code} is not defined. Please define it before starting the rental."))
+
+
+
+
+
