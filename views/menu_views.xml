@@ -23,6 +23,13 @@
         />
 
         <menuitem 
+            id="menu_gdi_rental_delivery_order"
+            name="RDO"
+            action="action_gdi_rental_view"
+            sequence="35"
+        />
+
+        <menuitem 
             id="gdi_menu_rental_equipment"
             name="Rental Equipment"
             sequence="40">

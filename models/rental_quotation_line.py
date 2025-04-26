@@ -4,8 +4,9 @@
 from datetime import timedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import get_lang
+from dateutil.relativedelta import relativedelta
 
 class RentalQuotationLine(models.Model):
     _name = 'rental.quotation.line'
@@ -48,17 +49,36 @@ class RentalQuotationLine(models.Model):
     state = fields.Selection(
         related='quotation_id.state', string='Order Status', copy=False, store=True)
     
-    item_type = fields.Selection([('regular', 'Regular'), ('set', 'Set')], default='regular', string="Type", required=True)
-    start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", required=False)
+    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
 
-    duration = fields.Integer(string="Duration", default=1, required=True)
+    start_date = fields.Date(string="Start Date", related="quotation_id.start_date", store=True)
+    end_date = fields.Date(string="End Date", compute='_compute_end_date', store=True)
+    
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
+
+    duration = fields.Integer(string="Duration", required=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
         ('week', 'weeks'),
         ('month', 'Months')
-    ], string="Unit", default='day', required=True)
+    ], string="Unit", required=True)
+
+    duration_string = fields.Char(string="Duration String", compute="_compute_duration_string")
 
     component_line_ids = fields.One2many("rental.quotation.component", 
                                          "quotation_line_id", 
@@ -71,6 +91,26 @@ class RentalQuotationLine(models.Model):
             'The end date must be after the start date.'
         )
     ]
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super(RentalQuotationLine, self).default_get(fields_list)
+
+        if self._context.get("default_quotation_id"):
+            quotation_id = self._context.get("default_quotation_id")
+            quotation = self.env["rental.quotation"].browse(quotation_id)
+            if quotation:
+                res.update({
+                    "duration": quotation.duration,
+                    "duration_unit": quotation.duration_unit
+                })
+        
+        return res
+    
+    @api.depends('duration', 'duration_unit')
+    def _compute_duration_string(self):
+        for record in self:
+            record.duration_string = f"{record.duration} {dict(self._fields['duration_unit'].selection).get(record.duration_unit, 'Not Defined')}"
 
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
@@ -90,8 +130,6 @@ class RentalQuotationLine(models.Model):
     def onchange_item_type(self):
         for rec in self:
             rec.product_id = False
-            rec.duration = 1
-            rec.duration_unit = 'day'
             rec.product_uom_txt = 'SET'
 
     @api.onchange('product_id')
@@ -139,6 +177,17 @@ class RentalQuotationLine(models.Model):
 
         if self.quotation_id.pricelist_id and self.quotation_id.partner_id:
             rental_pricing_list = self._get_rental_pricing_list(product)
+            if not rental_pricing_list:
+                raise ValidationError(
+                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.duration_unit)
+                )
+            rental_pricing_keys = rental_pricing_list.keys()
+            if self.duration_unit not in rental_pricing_keys:
+                readable_units = ", ".join(rental_pricing_keys)
+                raise ValidationError(
+                    f"This product is not available for rental by {self.duration_unit}. "
+                    f"Please choose from the available options: {readable_units}."
+                )
             rental_price = rental_pricing_list[self.duration_unit] * self.duration
             vals['price_unit'] = product._get_tax_included_unit_price(
                 self.company_id,

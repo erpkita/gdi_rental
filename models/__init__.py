@@ -7,3 +7,4 @@ from . import rental_order_line
 from . import rental_order_component
 from . import rental_contract
 from . import rental_contract_line
+from . import rental_delivery_order

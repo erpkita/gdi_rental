@@ -3,6 +3,7 @@
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from dateutil.relativedelta import relativedelta
 
 class RentalContract(models.Model):
     _name = "rental.contract"
@@ -15,11 +16,25 @@ class RentalContract(models.Model):
     customer_reference = fields.Char(string="Customer Reference", copy=False)
     customer_po_number = fields.Char(string="Customer Ref. PO", copy=False)
     start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", required=False)
+    end_date = fields.Date(string="End Date", compute="_compute_end_date", store=True)
+
+    duration = fields.Integer(string="Duration", default=1, required=True, compute="_compute_duration_from_lines", inverse="_inverse_duration", store=True)
+    duration_unit = fields.Selection([
+        ('hour', 'Hours'),
+        ('day', 'Days'),
+        ('week', 'weeks'),
+        ('month', 'Months')
+    ], string="Unit", required=True,
+    compute="_compute_duration_from_lines",
+    inverse="_inverse_duration",
+    store=True,
+    default='month'
+    )    
+
     date_definition_level = fields.Selection([
         ('order', 'Rental Order Level'),
         ('item', 'Rental Order Item Level')
-    ], string="Date Definition Lvl", default='order', required=True,
+    ], string="Date Definition Lvl", default='order',
        help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level.")
     pricelist_id = fields.Many2one(
         'product.pricelist', string='Pricelist', check_company=True,  # Unrequired company
@@ -44,6 +59,76 @@ class RentalContract(models.Model):
         domain="[('company_id', '=', company_id)]", check_company=True,
         help="Fiscal positions are used to adapt taxes and accounts for particular customers or sales orders/invoices."
         "The default value comes from the customer.")
+    
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('signed', 'Signed'),
+        ('cancel', 'Cancelled')
+    ], string="Status", default='draft')
+    
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                # For hours, we need to handle it differently as Date fields don't have hours
+                # This is a simplified approach - you might need to convert to datetime if precision is critical
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
+
+    @api.model
+    def _convert_to_days(self, duration, duration_unit):
+        """Convert any duration unit to approximate days for comparison"""
+        if duration_unit == 'hour':
+            return duration / 24
+        elif duration_unit == 'day':
+            return duration
+        elif duration_unit == 'week':
+            return duration * 7
+        elif duration_unit == 'month':
+            return duration * 30  # Approximation
+        return 0
+    
+    # @api.onchange('duration', 'duration_unit')
+    # def _onchange_header_duration(self):
+    #     """Update all line durations when header duration changes"""
+    #     if self.contract_line_ids:
+    #         for line in self.contract_line_ids:
+    #             line.duration = self.duration
+    #             line.duration_unit = self.duration_unit
+
+    @api.depends("contract_line_ids", "contract_line_ids.duration", "contract_line_ids.duration_unit")
+    def _compute_duration_from_lines(self):
+        for record in self:
+            record.update_header_duration()
+
+    def _inverse_duration(self):
+        # Just allow the fields to be editable.
+        pass    
+    
+    def update_header_duration(self):
+        """Update header duration based on longest line item"""
+        longest_days = 0
+        longest_duration = self.duration
+        longest_unit = self.duration_unit
+        
+        for line in self.contract_line_ids:
+            line_days = self._convert_to_days(line.duration, line.duration_unit)
+            if line_days > longest_days:
+                longest_days = line_days
+                longest_duration = line.duration
+                longest_unit = line.duration_unit
+        
+        self.duration = longest_duration
+        self.duration_unit = longest_unit
 
     @api.model
     def create(self, vals):

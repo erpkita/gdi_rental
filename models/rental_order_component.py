@@ -4,6 +4,7 @@
 from datetime import timedelta
 
 from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 from odoo.tools.misc import get_lang
 
 class RentalOrderComponent(models.Model):
@@ -109,6 +110,17 @@ class RentalOrderComponent(models.Model):
         vals = {}
         if not self.product_uom or (self.product_id.uom_id.id != self.product_uom.id):
             rental_pricing_list = self._get_rental_pricing_list(self.product_id)
+            if not rental_pricing_list:
+                raise ValidationError(
+                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.quotation_duration_unit)
+                )
+            rental_pricing_keys = rental_pricing_list.keys()
+            if self.quotation_duration_unit not in rental_pricing_keys:
+                readable_units = ", ".join(rental_pricing_keys)
+                raise ValidationError(
+                    f"This product is not available for rental by {self.quotation_duration_unit}. "
+                    f"Please choose from the available options: {readable_units}."
+                )
             rental_price = rental_pricing_list[self.quotation_duration_unit] * self.quotation_duration
             vals['product_uom'] = self.product_id.uom_id
             vals['price_unit'] = rental_price

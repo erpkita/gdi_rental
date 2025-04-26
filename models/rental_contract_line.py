@@ -6,6 +6,7 @@ from datetime import timedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import get_lang
+from dateutil.relativedelta import relativedelta
 
 class RentalContractLine(models.Model):
     _name = 'rental.contract.line'
@@ -44,28 +45,66 @@ class RentalContractLine(models.Model):
     currency_id = fields.Many2one(related='contract_id.currency_id', depends=['contract_id.currency_id'], store=True, string='Currency')
     order_partner_id = fields.Many2one(related='contract_id.partner_id', store=True, string='Customer', index=True)
     
-    item_type = fields.Selection([('regular', 'Regular'), ('set', 'Set')], default='regular', string="Type", required=True)
+    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
     start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", required=False)
+    end_date = fields.Date(string="End Date", compute='_compute_end_date', required=False)
 
-    duration = fields.Integer(string="Duration", default=1, required=True)
+    duration = fields.Integer(string="Duration", required=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
         ('week', 'weeks'),
         ('month', 'Months')
-    ], string="Unit", default='day', required=True)
+    ], string="Unit", required=True)
+
+    duration_string = fields.Char(string="Duration Str", compute='_compute_duration_string')
+
     discount = fields.Float(string='Discount (%)', digits='Discount', default=0.0)
     date_definition_level = fields.Selection(
         related="contract_id.date_definition_level", string="Date Definition Level",
        help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level."
     )
-    start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", required=False)
 
     component_line_ids = fields.One2many("rental.contract.component", 
                                          "contract_line_id", 
                                          string="Components")
+    
+    @api.model
+    def default_get(self, fields_list):
+        res = super(RentalContractLine, self).default_get(fields_list)
+
+        if self._context.get("default_contract_id"):
+            contract_id = self._context.get("default_contract_id")
+            order = self.env["rental.contract"].browse(contract_id)
+            if order:
+                res.update({
+                    "duration": order.duration,
+                    "duration_unit": order.duration_unit,
+                    "start_date": order.start_date
+                })
+        
+        return res
+    
+    @api.depends('duration', 'duration_unit')
+    def _compute_duration_string(self):
+        for record in self:
+            record.duration_string = f"{record.duration} {dict(self._fields['duration_unit'].selection).get(record.duration_unit)}"
+    
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
     
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
@@ -126,6 +165,17 @@ class RentalContractLine(models.Model):
 
         if self.contract_id.pricelist_id and self.contract_id.partner_id:
             rental_pricing_list = self._get_rental_pricing_list(product)
+            if not rental_pricing_list:
+                raise ValidationError(
+                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.duration_unit)
+                )
+            rental_pricing_keys = rental_pricing_list.keys()
+            if self.duration_unit not in rental_pricing_keys:
+                readable_units = ", ".join(rental_pricing_keys)
+                raise ValidationError(
+                    f"This product is not available for rental by {self.duration_unit}. "
+                    f"Please choose from the available options: {readable_units}."
+                )            
             rental_price = rental_pricing_list[self.duration_unit] * self.duration
             vals['price_unit'] = product._get_tax_included_unit_price(
                 self.company_id,

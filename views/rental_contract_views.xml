@@ -22,7 +22,8 @@
             <form string="Rental Contracts" class="o_sale_order">
                 <field name="company_id" invisible="1"/>
                 <header>
-                    <button name="create_do" type="object" string="Create DO" class="oe_highlight"/>
+                    <button name="create_do" type="object" string="Sign &amp; Create DO" class="oe_highlight"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,signed,cancel"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -40,22 +41,40 @@
                         </group>
                         <group name="order_details">
                             <field name="order_id"/>
-                            <field name="create_date"/>
-                            <field name="date_definition_level" string="Date Definition Lvl."/>
-                            <label for="start_date" string="Rental Period" attrs="{'invisible': [('date_definition_level', '=', 'item')]}"/>
-                            <div class="o_row" attrs="{'invisible': [('date_definition_level', '=', 'item')]}">
-                                <field name="start_date" attrs="{'required': [('date_definition_level', '=', 'order')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
-                                <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'order')]}"  widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
-                            </div>
+                            <field name="create_date" string="Created Date"/>
                             <field name="customer_reference" string="Customer Ref." invisible="1"/>
                             <field name="customer_po_number" invisible="1"/>
                             <field name="pricelist_id" invisible="1"/>
                         </group>
                     </group>
+                    <group string="Rental Overview">
+
+                        <!-- Active Schedule Group -->
+                        <group string="Duration">
+                            <label for="duration"/>
+                            <!-- Info box above the fields, not wrapping them -->
+                            <div class="o_row">
+                                <field name="duration" attrs="{'readonly': [('state', 'in', ['cancel', 'signed'])]}"/>
+                                <field name="duration_unit" attrs="{'readonly': [('state', 'in', ['cancel', 'signed'])]}"/>
+                            </div>
+                            <div class="alert-secondary" colspan="2" role="alert" style="margin-bottom: 8px;">
+                                <strong>Info:</strong> This duration is based on the item with the longest rental period among the selected items.
+                            </div>
+                        </group>
+                        
+                        <!-- Initial Schedule Group -->
+                        <group string="Period">
+                            <field name="start_date" string="Start Date"/>
+                            <field name="end_date" string="End Date" readonly="1"/>
+                        </group>
+
+                    </group>
                     <notebook>
                         <page string="Rental Items" name="rental_items">
                             <field name="contract_line_ids"
+                                   context="{
+                                        'default_contract_id': id,
+                                   }"
                                    widget="section_and_note_one2many">
                                 <tree
                                     string="Rental Order Lines">
@@ -65,7 +84,7 @@
 
                                     <field name="sequence" widget="handle" />
                                     <field name="product_uom_category_id" invisible="1"/>
-                                    <field name="item_type"/>
+                                    <field name="item_type" invisible="1"/>
                                     <field name="item_code"/>
                                     <field
                                         name="product_id"
@@ -99,6 +118,7 @@
                                       domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
                                       widget="product_configurator"/>
                                     <field name="name" widget="section_and_note_text" required="1"/>
+                                    <field name="duration_string" string="Duration"/>
                                     <field
                                         name="product_uom_qty"
                                         context="{
@@ -116,8 +136,9 @@
                                         context="{'company_id': parent.company_id}"
                                         groups="uom.group_uom"
                                         options='{"no_open": True}'
-                                        optional="show"
+                                        optional="show" invisible="1"
                                     />
+                                    <field name="product_uom_txt" string="UoM"/>
                                     <field
                                         name="price_unit"
                                     />
@@ -140,7 +161,7 @@
                                                     'uom':product_uom, 
                                                     'company_id': parent.company_id}"
                                                 attrs="{
-                                                    'required': [('item_type', '=', 'regular')],
+                                                    'required': [('item_type', '=', 'unit')],
                                                     'invisible': [('item_type', '=', 'set')]
                                                 }"
                                                 force_save="1"
@@ -150,17 +171,16 @@
                                         </group> 
 
                                         <group name="product_period" colspan="2" string="Rental Duration">
-                                            <field name="date_definition_level" invisible="1"/>
                                             <label for="duration"/>
                                             <div class="o_row" name="duration_section">
                                                 <field name="duration"/>
                                                 <field name="duration_unit"/>
                                             </div>
-                                            <label for="start_date" string="Period" attrs="{'invisible': [('date_definition_level', '=', 'order')]}"/>
-                                            <div class="o_row" attrs="{'invisible': [('date_definition_level', '=', 'order')]}">
-                                                <field name="start_date" attrs="{'required': [('date_definition_level', '=', 'item')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
+                                            <label for="start_date" string="Period"/>
+                                            <div class="o_row">
+                                                <field name="start_date" nolabel="1" class="oe_inline"/>
                                                 <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                                <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'item')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
+                                                <field name="end_date" nolabel="1" class="oe_inline"/>
                                             </div>
                                         </group>
                                         <group colspan="2" string="Price and Quantity">
@@ -175,7 +195,7 @@
                                                     'company_id': parent.company_id}" 
                                                     name="product_uom_qty"/>
                                                 <field name="product_uom"
-                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'regular')]}"
+                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
                                                        groups="uom.group_uom" 
                                                        class="oe_no_button"/>
                                                 <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
@@ -195,7 +215,7 @@
                                         </group>
                                     </group>
                                     <notebook>
-                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'regular')]}">
+                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'unit')]}">
                                             <group col="4">
                                                 <field name="component_line_ids" colspan="4" nolabel="1" attrs="{'required': [('item_type', '=', 'set')]}">
                                                     <tree>

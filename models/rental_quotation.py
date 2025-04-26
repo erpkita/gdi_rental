@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
 from odoo.tools import float_is_zero, html_keep_url, is_html_empty
+from dateutil.relativedelta import relativedelta
 
 
 class RentalQuotation(models.Model):
@@ -121,6 +122,84 @@ class RentalQuotation(models.Model):
     ], default='draft')
 
     rental_id = fields.Many2one("gdi.rental.order", string="Rental Order", readonly=True)
+
+    start_date = fields.Date(string="Start Date", default=fields.Date.today)
+    end_date = fields.Date(string="End Date", compute="_compute_end_date", store=True)
+    duration = fields.Integer(string="Duration", default=1, required=True, compute="_compute_duration_from_lines", inverse="_inverse_duration", store=True)
+    duration_unit = fields.Selection([
+        ('hour', 'Hours'),
+        ('day', 'Days'),
+        ('week', 'weeks'),
+        ('month', 'Months')
+    ], string="Unit", default='month', required=True,
+    compute="_compute_duration_from_lines",
+    inverse="_inverse_duration",
+    store=True
+    )
+
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                # For hours, we need to handle it differently as Date fields don't have hours
+                # This is a simplified approach - you might need to convert to datetime if precision is critical
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
+
+    @api.model
+    def _convert_to_days(self, duration, duration_unit):
+        """Convert any duration unit to approximate days for comparison"""
+        if duration_unit == 'hour':
+            return duration / 24
+        elif duration_unit == 'day':
+            return duration
+        elif duration_unit == 'week':
+            return duration * 7
+        elif duration_unit == 'month':
+            return duration * 30  # Approximation
+        return 0
+    
+    # @api.onchange('duration', 'duration_unit')
+    # def _onchange_header_duration(self):
+    #     """Update all line durations when header duration changes"""
+    #     if self.order_line:
+    #         for line in self.order_line:
+    #             line.duration = self.duration
+    #             line.duration_unit = self.duration_unit
+
+    @api.depends("order_line", "order_line.duration", "order_line.duration_unit")
+    def _compute_duration_from_lines(self):
+        for record in self:
+            record.update_header_duration()
+
+    def _inverse_duration(self):
+        # Just allow the fields to be editable.
+        pass    
+    
+    def update_header_duration(self):
+        """Update header duration based on longest line item"""
+        longest_days = 0
+        longest_duration = self.duration
+        longest_unit = self.duration_unit
+        
+        for line in self.order_line:
+            line_days = self._convert_to_days(line.duration, line.duration_unit)
+            if line_days > longest_days:
+                longest_days = line_days
+                longest_duration = line.duration
+                longest_unit = line.duration_unit
+        
+        self.duration = longest_duration
+        self.duration_unit = longest_unit
 
     @api.model
     def create(self, vals):
@@ -249,7 +328,11 @@ class RentalQuotation(models.Model):
             'date_order': self.date_order,
             'currency_id': self.currency_id.id or False,
             'order_line' : [],
-            'fiscal_position_id': self.fiscal_position_id.id
+            'fiscal_position_id': self.fiscal_position_id.id,
+            'duration': self.duration,
+            'duration_unit': self.duration_unit,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
         }
 
         return order_vals
@@ -266,7 +349,9 @@ class RentalQuotation(models.Model):
             'price_unit': line.price_unit,
             'tax_id' : line.tax_id.ids or False,
             'duration': line.duration,
-            'duration_unit': line.duration_unit
+            'duration_unit': line.duration_unit,
+            'start_date': line.start_date,
+            'end_date': line.end_date
         }
         if line.item_type == 'set':
             component_records = []

@@ -39,6 +39,7 @@
                     </div>
                     <group name="rq_header">
                         <group name="partner_details">
+                            <field name="id" invisible="1"/>
                             <field name="partner_id" 
                                    attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"
                                    widget="res_partner_many2one" 
@@ -81,9 +82,28 @@
                                    invisible="1"/>
                         </group>
                     </group>
+                    <group name="rental_duration" string="Rental Duration">
+                        <group>
+                            <div class="alert-secondary" colspan="2" role="alert" style="margin-bottom: 8px;">
+                                <strong>Info:</strong> This duration is based on the item with the longest rental period among the selected items.
+                            </div>
+                            <label for="duration"/>
+                            <!-- Info box above the fields, not wrapping them -->
+                            <div class="o_row">
+                                <field name="duration" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
+                                <field name="duration_unit" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
+                            </div>
+                        </group>
+                        <group>
+                            <field name="start_date" attrs="{'readonly': [('state', 'in', ['cancel', 'confirm', 'lock'])]}"/>
+                            <field name="end_date" readonly="1"/>
+                        </group>
+                    </group>
                     <notebook>
-                        <page string="Quotation Lines" name="quotation_lines">
-                            <field name="order_line"
+                        <page string="Quotation Lines" name="quotation_lines" >
+                            <field name="order_line" context="{'default_quotation_id': id,
+                                                               'default_duration': duration,
+                                                               'default_duration_unit': duration_unit}"
                                    widget="section_and_note_one2many"
                                    attrs="{'readonly': [('state', 'in', ('confirm', 'cancel', 'lock'))]}">
                                 <tree
@@ -96,7 +116,7 @@
                                     <field name="sequence" widget="handle" />
                                     <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
                                     <field name="product_uom_category_id" invisible="1"/>
-                                    <field name="item_type"/>
+                                    <field name="item_type" invisible="1"/>
                                     <field name="item_code"/>
                                     <field
                                         name="product_id"
@@ -113,7 +133,7 @@
                                         domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
                                         widget="product_configurator"
                                         attrs="{
-                                            'required': [('item_type', '=', 'regular')]
+                                            'required': [('item_type', '=', 'unit')]
                                         }"
                                         invisible="1"
                                     />
@@ -133,6 +153,7 @@
                                       domain="[('rent_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
                                       widget="product_configurator"/>
                                     <field name="name" widget="section_and_note_text" required="1"/>
+                                    <field name="duration_string" string="Duration"/>
                                     <field
                                         name="product_uom_qty"
                                         context="{
@@ -161,9 +182,9 @@
                                         options="{'no_create': True}"
                                         domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
                                         context="{'active_test': True}"
-                                        optional="show"
+                                        optional="hide"
                                     />
-                                    <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line" optional="show" widget="product_discount"/>
+                                    <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line" optional="hide" widget="product_discount"/>
                                     <field name="price_subtotal" widget="monetary" groups="account.group_show_line_subtotals_tax_excluded"/>
                                     <field name="price_total" widget="monetary" groups="account.group_show_line_subtotals_tax_included"/>
                                     <field name="state" invisible="1"/>
@@ -192,11 +213,12 @@
                                                     'uom':product_uom, 
                                                     'company_id': parent.company_id}"
                                                 attrs="{
-                                                    'required': [('item_type', '=', 'regular')],
+                                                    'required': [('item_type', '=', 'unit')],
                                                     'invisible': [('item_type', '=', 'set')]
                                                 }"
                                                 force_save="1"
                                                 widget="many2one_barcode"
+                                                options="{'no_create': True, 'no_open': True}"
                                             />
                                             <field name="name" string="Description"/>
                                             <field name="item_code" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
@@ -227,7 +249,7 @@
                                                     'company_id': parent.company_id}" 
                                                     name="product_uom_qty"/>
                                                 <field name="product_uom"
-                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'regular')]}"
+                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
                                                        groups="uom.group_uom" 
                                                        class="oe_no_button"/>
                                                 <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
@@ -255,7 +277,7 @@
                                         </group>
                                     </group>
                                     <notebook>
-                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'regular')]}">
+                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'unit')]}">
                                             <group col="4">
                                                 <field name="component_line_ids" colspan="4" nolabel="1" attrs="{'required': [('item_type', '=', 'set')]}">
                                                     <tree>
@@ -271,7 +293,7 @@
                                                         <group>
                                                             <field name="product_uom_category_id" invisible="1"/>
                                                             <group colspan="4" string="Product Info">
-                                                                <field name="product_id"/>
+                                                                <field name="product_id" domain="[('rent_ok', '=', True)]" options="{'no_create': True, 'no_open': True}"/>
                                                                 <field name="name"/>
                                                             </group>
 

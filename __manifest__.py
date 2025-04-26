@@ -26,6 +26,7 @@
     'data': [
         'security/ir.model.access.csv',
         'data/gdi_rental_sequence.xml',
+        # 'data/gdi_rental_picking_type.xml',
         'report/rental_quotation_templates.xml',
         'report/rental_reports.xml',
         'wizard/views/rental_contract_creation_wizard_views.xml',
@@ -33,6 +34,7 @@
         'views/rental_quotation_views.xml',
         'views/rental_order_views.xml',
         'views/rental_contract_views.xml',
+        'views/rental_delivery_order_views.xml',
         'views/menu_views.xml',
     ],
     'license': 'LGPL-3',

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+
+    <data>
+        <record id="gdi_rental_picking_type_delivery" model="stock.picking.type">
+            <field name="name">Rental Delivery Orders</field>
+            <field name="code">outgoing</field>
+            <field name="sequence_id" eval="ref('gdi_rental.gdi_rental_delivery_order_sequence')"/>
+            <field name="warehouse_id" eval="ref('stock.warehouse0')"/>
+            <field name="default_location_src_id" eval="ref('stock.stock_location_stock')"/>
+            <field name="default_location_dest_id" eval="ref('stock.stock_location_customers')"/>
+        </record>
+    </data>
+
+</odoo>

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
+from dateutil.relativedelta import relativedelta
 
 class GdiRentalOrder(models.Model):
     _name = "gdi.rental.order"
@@ -111,8 +112,95 @@ class GdiRentalOrder(models.Model):
     ], string="Date Definition Level", default='order', required=True,
        help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level.")
 
-    start_date = fields.Datetime(string="Start Date")
-    end_date = fields.Datetime(string="End Date")
+    start_date = fields.Date(string="Start Date", default=fields.Date.today, required=True)
+    end_date = fields.Date(string="Initial End Date", compute="_compute_end_date", store=True)
+
+    duration = fields.Integer(string="Duration", default=1, required=True, compute="_compute_duration_from_lines", inverse="_inverse_duration", store=True)
+    duration_unit = fields.Selection([
+        ('hour', 'Hours'),
+        ('day', 'Days'),
+        ('week', 'weeks'),
+        ('month', 'Months')
+    ], string="Unit", required=True,
+    compute="_compute_duration_from_lines",
+    inverse="_inverse_duration",
+    store=True
+    )
+
+    duration_string = fields.Char(string="Duration Str", compute="_compute_duration_str")
+
+    effective_end_date = fields.Date(string="Effective End Date")
+    contract_id = fields.Many2one("rental.contract", string="Active Contract")
+
+    @api.depends('duration', 'duration_unit')
+    def _compute_duration_str(self):
+        for record in self:
+            record.duration_string = f"{record.duration} {dict(self._fields['duration_unit'].selection).get(record.duration_unit, 'Not Defined')}"
+
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                # For hours, we need to handle it differently as Date fields don't have hours
+                # This is a simplified approach - you might need to convert to datetime if precision is critical
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
+
+    @api.model
+    def _convert_to_days(self, duration, duration_unit):
+        """Convert any duration unit to approximate days for comparison"""
+        if duration_unit == 'hour':
+            return duration / 24
+        elif duration_unit == 'day':
+            return duration
+        elif duration_unit == 'week':
+            return duration * 7
+        elif duration_unit == 'month':
+            return duration * 30  # Approximation
+        return 0
+    
+    # @api.onchange('duration', 'duration_unit')
+    # def _onchange_header_duration(self):
+    #     """Update all line durations when header duration changes"""
+    #     if self.order_line:
+    #         for line in self.order_line:
+    #             line.duration = self.duration
+    #             line.duration_unit = self.duration_unit
+
+    @api.depends("order_line", "order_line.duration", "order_line.duration_unit")
+    def _compute_duration_from_lines(self):
+        for record in self:
+            record.update_header_duration()
+
+    def _inverse_duration(self):
+        # Just allow the fields to be editable.
+        pass    
+    
+    def update_header_duration(self):
+        """Update header duration based on longest line item"""
+        longest_days = 0
+        longest_duration = self.duration
+        longest_unit = self.duration_unit
+        
+        for line in self.order_line:
+            line_days = self._convert_to_days(line.duration, line.duration_unit)
+            if line_days > longest_days:
+                longest_days = line_days
+                longest_duration = line.duration
+                longest_unit = line.duration_unit
+        
+        self.duration = longest_duration
+        self.duration_unit = longest_unit
+
 
     @api.model
     def create(self, vals):
@@ -203,11 +291,11 @@ class GdiRentalOrder(models.Model):
 
     def action_generate_contract(self):
         for rec in self:
-            if rec.date_definition_level == "order":
-                rec._order_check_rental_period()
-            else:
-                for line in rec.order_line:
-                    line.check_rental_period()
+            # if rec.date_definition_level == "order":
+            #     rec._order_check_rental_period()
+            # else:
+            #     for line in rec.order_line:
+            #         line.check_rental_period()
             
             contract_id = self.env["rental.contract"].create(rec._prepare_contract_vals())
             for line in rec.order_line:
@@ -215,7 +303,7 @@ class GdiRentalOrder(models.Model):
                 contract_line_values.update({'contract_id': contract_id.id})
                 self.env["rental.contract.line"].create(contract_line_values)
             
-            rec.write({'state': 'ongoing'})
+            rec.write({'state': 'ongoing'}) 
             # return rec.action_view_rental_contract(contract_id)
             return contract_id
     
@@ -287,11 +375,55 @@ class GdiRentalOrder(models.Model):
 
     def action_print_order(self):
         pass
+
+    def _prepare_rental_contract_vals(self, order):
+        if not order:
+            raise ValidationError(_("Could not process rental order. Please contact administrator !"))
+        return {
+            'order_id': order.id or False,
+            'partner_id': order.partner_id.id or False,
+            'customer_reference': order.customer_reference or '',
+            'customer_po_number': order.customer_po_number or '',
+            'duration': order.duration or 1,
+            'duration_unit': order.duration_unit or 'month',
+            'start_date': order.start_date or False,
+            'end_date': order.end_date or False,
+            'pricelist_id': order.pricelist_id.id or False,
+            'fiscal_position_id': order.fiscal_position_id.id or False,
+        }
     
     def action_start_rental(self):
         for rec in self:
+            contract_vals = rec._prepare_rental_contract_vals(rec)
+            contract_line_ids = []
             for line in rec.order_line:
                 line.check_rental_period()
+                contract_line_ids.append((
+                    0, 
+                    0, 
+                    line._get_contract_line_vals()
+                ))
+            contract_vals.update({'contract_line_ids': contract_line_ids})
+            contract_id = self.env['rental.contract'].create(contract_vals)
+
+            if not contract_id:
+                raise ValidationError(_("Error while creating contract. Please contact administrator !"))
+            
+            rec.write({
+                'state': 'ongoing', 
+                'effective_end_date': rec.end_date,
+                'contract_id': contract_id.id
+            })
 
     def action_hireoff(self):
         pass
+
+
+    def open_related_contract(self):
+        for rec in self:
+            return {
+                "type": "ir.actions.act_window",
+                "res_id": rec.contract_id.id or False,
+                "res_model": "rental.contract",
+                "view_mode": "form"
+            }

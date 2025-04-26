@@ -17,6 +17,12 @@
             <field name="padding">4</field>
         </record>
 
+        <record id="gdi_rental_delivery_order_sequence" model="ir.sequence">
+            <field name="name">GDI RDO Sequence</field>
+            <field name="code">gdi.rental.delivery.order.seq</field>
+            <field name="prefix">RDO%(y)s%(month)s</field>
+            <field name="padding">4</field>
+        </record>
 
     </data>
 

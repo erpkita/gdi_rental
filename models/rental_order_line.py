@@ -7,7 +7,9 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import get_lang
 
-class RentalOrderLine(models.Model):
+from dateutil.relativedelta import relativedelta
+
+class GDIRentalOrderLine(models.Model):
     _name = 'gdi.rental.order.line'
     _description = 'Rental Order Line'
     _order = 'order_id, sequence, id'
@@ -47,22 +49,19 @@ class RentalOrderLine(models.Model):
     state = fields.Selection(
         related='order_id.state', string='Order Status', copy=False, store=True)
     
-    item_type = fields.Selection([('regular', 'Regular'), ('set', 'Set')], default='regular', string="Type", required=True)
+    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
     date_definition_level = fields.Selection(
         related="order_id.date_definition_level", string="Date Definition Level",
        help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level."
     )
 
-    start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", required=False)
-
-    duration = fields.Integer(string="Duration", default=1, required=True)
+    duration = fields.Integer(string="Duration", required=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
         ('week', 'weeks'),
         ('month', 'Months')
-    ], string="Unit", default='day', required=True)
+    ], string="Unit", required=True)
 
     available_qty = fields.Float(string="Available Qty", compute="_get_available_qty")
     src_location_id = fields.Many2one("stock.location", string="Source Location")
@@ -72,6 +71,67 @@ class RentalOrderLine(models.Model):
     component_line_ids = fields.One2many("rental.order.component", 
                                          "order_line_id", 
                                          string="Components")
+    
+    start_date = fields.Date(string="Start Date", compute='_compute_start_date', store=True, inverse='_inverse_start_date')
+    end_date = fields.Date(string="End Date", compute='_compute_end_date', store=True, inverse='_inverse_end_date')
+
+    duration_string = fields.Char(string="Duration Str", compute="_compute_duration_str")
+
+    rental_state = fields.Selection([
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('hireoff', 'Hired-Off')
+    ], string="Rental Status", default="draft")
+
+    @api.depends('duration', 'duration_unit')
+    def _compute_duration_str(self):
+        for record in self:
+            duration_unit = dict(self._fields['duration_unit'].selection).get(record.duration_unit, 'Not Defined')
+            record.duration_string = f"{record.duration} {duration_unit}"
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super(GDIRentalOrderLine, self).default_get(fields_list)
+
+        if self._context.get("default_order_id"):
+            order_id = self._context.get("default_order_id")
+            order = self.env["rental.order"].browse(order_id)
+            if order:
+                res.update({
+                    "duration": order.duration,
+                    "duration_unit": order.duration_unit,
+                    "start_date": order.start_date
+                })
+        
+        return res
+    
+    @api.depends('order_id', 'order_id.start_date')
+    def _compute_start_date(self):
+        for record in self:
+            start_date = record.order_id.start_date
+            record.start_date = start_date
+    
+    def _inverse_start_date(self):
+        pass
+    
+    @api.depends('start_date', 'duration', 'duration_unit')
+    def _compute_end_date(self):
+        for record in self:
+            if not record.start_date:
+                record.end_date = False
+                continue
+                
+            if record.duration_unit == 'hour':
+                record.end_date = record.start_date + relativedelta(hours=record.duration)
+            elif record.duration_unit == 'day':
+                record.end_date = record.start_date + relativedelta(days=record.duration)
+            elif record.duration_unit == 'week':
+                record.end_date = record.start_date + relativedelta(weeks=record.duration)
+            elif record.duration_unit == 'month':
+                record.end_date = record.start_date + relativedelta(months=record.duration)
+
+    def _inverse_end_date(self):
+        pass
 
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
@@ -137,8 +197,6 @@ class RentalOrderLine(models.Model):
     def onchange_item_type(self):
         for rec in self:
             rec.product_id = False
-            rec.duration = 1
-            rec.duration_unit = 'day'
             rec.product_uom_txt = 'SET'
 
     @api.onchange('product_id')
@@ -185,6 +243,18 @@ class RentalOrderLine(models.Model):
 
         if self.order_id.pricelist_id and self.order_id.partner_id:
             rental_pricing_list = self._get_rental_pricing_list(product)
+            if not rental_pricing_list:
+                raise ValidationError(
+                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.duration_unit)
+                )
+            rental_pricing_keys = rental_pricing_list.keys()
+            if self.duration_unit not in rental_pricing_keys:
+                readable_units = ", ".join(rental_pricing_keys)
+                raise ValidationError(
+                    f"This product is not available for rental by {self.duration_unit}. "
+                    f"Please choose from the available options: {readable_units}."
+                )
+
             rental_price = rental_pricing_list[self.duration_unit] * self.duration
             vals['price_unit'] = product._get_tax_included_unit_price(
                 self.company_id,
@@ -221,6 +291,41 @@ class RentalOrderLine(models.Model):
             if not rec.end_date:
                 raise ValidationError(_(f"Rental period end date for item code {rec.item_code} is not defined. Please define it before starting the rental."))
 
+    def _get_contract_line_vals(self):
+        for rec in self:
+            contract_line_vals =  {
+                'name': rec.name or '',
+                'item_code': rec.item_code or '',
+                'sequence': rec.sequence or '',
+                'product_id': rec.product_id.id or False,
+                'product_template_id': rec.product_template_id.id or False,
+                'product_uom_qty': rec.product_uom_qty or 1.0,
+                'product_uom': rec.product_uom.id or False,
+                'product_uom_category_id': rec.product_uom_category_id.id or False,
+                'product_uom_txt': rec.product_uom_txt or 'SET',
+                'price_unit': rec.price_unit or 0.0,
+                'item_type': rec.item_type,
+                'start_date': rec.start_date or False,
+                'end_date': rec.end_date or False,
+                'duration': rec.duration or False,
+                'duration_unit': rec.duration_unit or False,
+                'ro_line_id': rec.id or False
+            }
+            if rec.item_type == 'set':
+                component_line_ids = []
+                for comp in rec.component_line_ids:
+                    component_line_ids.append((
+                        0, 0, {
+                            'product_id': comp.product_id.id or False,
+                            'name': comp.name or False,
+                            'price_unit': comp.price_unit or 0.0,
+                            'product_uom_qty': comp.product_uom_qty or 0.0,
+                            'product_uom': comp.product_uom.id
+                        }
+                    ))
+                contract_line_vals.update({'component_line_ids': component_line_ids})
+
+            return contract_line_vals
 
 
 
