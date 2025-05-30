@@ -10,10 +10,92 @@
                     <group>
                         <field name="rental_id" readonly="1"/>
                     </group>
+                    <group></group>
+                </group>
+                <group string="Customer Reference">
                     <group>
-                        <field name="date_definition_level" required="1" string="Date Definition Lvl."/>
+                        <field name="customer_reference" string="Customer Ref."/>
+                    </group>
+                    <group>
+                        <field name="customer_po_number"/>
                     </group>
                 </group>
+                <group string="Rental Overview">
+                    <group string="Duration">
+                        <label for="duration"/>
+                        <div class="o_row">
+                            <field name="duration"/>
+                            <field name="duration_unit"/>
+                        </div>
+                        <div class="alert-secondary" colspan="2" role="alert" style="margin-bottom: 8px;">
+                            <strong>Info:</strong> This duration is based on the item with the longest rental period among the selected items.
+                        </div>
+                    </group>
+                    <group string="Schedule">
+                        <field name="start_date" string="Start Date"/>
+                        <field name="end_date" string="Initial End Date" readonly="1"/>
+                    </group>
+                </group>
+                <notebook>
+                    <page string="Rental Items">
+                        <field name="rental_contract_wizard_ids">
+                            <tree>
+                                <field name="contract_wiz_id" invisible="1"/>
+                                <field name="rental_order_line_id" invisible="1"/>
+                                <field name="item_code"/>
+                                <field name="name"/>
+                                <field name="product_id" invisible="1"/>
+                                <field name="duration_string" string="Duration"/>
+                                <field name="start_date"/>
+                                <field name="end_date"/>
+                                <field name="price_unit"/>
+                                <field name="product_uom_qty"/>
+                                <field name="product_uom_txt"/>
+                                <field name="price_subtotal"/>
+                            </tree>
+                            <form>
+                                <group string="Product Information">
+                                    <field name="item_type" invisible="1"/>
+                                    <group>
+                                        <field name="product_id"/>
+                                        <field name="item_code"/>
+                                    </group>
+                                    <group>
+                                        <field name="name"/>
+                                    </group>
+                                </group>
+                                <group>
+                                    <group string="Rental Duration">
+                                        <label for="duration"/>
+                                        <div class="o_row">
+                                            <field name="duration" required="1"/>
+                                            <field name="duration_unit"/>
+                                        </div>
+                                        <label for="start_date" string="From"/>
+                                        <div class="o_row">
+                                            <field name="start_date" nolabel="1" class="oe_inline" readonly="1"/>
+                                            <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
+                                            <field name="end_date" nolabel="1" class="oe_inline" readonly="1"/>
+                                        </div>
+                                    </group>
+                                    <group string="Price and Quantity">
+                                        <field name="product_uom_category_id" invisible="1"/>
+                                        <label for="product_uom_qty"/>
+                                        <div class="o_row" name="ordered_qty">
+                                            <field name="product_uom_qty"/>
+                                            <field name="product_uom"
+                                                    force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
+                                                    groups="uom.group_uom" 
+                                                    class="oe_no_button"/>
+                                            <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
+                                        </div>
+                                        <field name="price_unit"/>
+                                    </group>
+                                </group>
+                            </form>
+                        </field>
+                    </page>
+                </notebook>
               <footer>
                   <button string="Create" type="object" name="action_create_contract" class="btn-primary"/>
                   <button string="Cancel" class="btn-secondary" special="cancel"/>

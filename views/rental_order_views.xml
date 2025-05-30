@@ -29,10 +29,10 @@
                 <header>
                     <!-- <button name="action_start_rental" states="confirm" string="Start Rental" type="object" class="oe_highlight"/> -->
                     <!-- <button name="action_generate_contract" states="confirm" string="Generate Contract" type="object" class="oe_highlight"/> -->
-                    <button name="action_start_rental" type="object" string="Create Contract" states="confirm" class="btn-primary"/>
-                    <button name="action_create_contract" type="object" string="Create Contract" states="ongoing" class="btn-primary"/>
-                    <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="oe_highlight"/>
-                    <button name="action_hireoff" states="ongoing" string="Hire off" type="object" class="oe_highlight"/>
+                    <button name="action_start_rental" type="object" string="Create Contract" states="confirm" class="btn-primary" confirm="Please make sure the rental period are properly setup."/>
+                    <button name="action_create_contract" type="object" string="Extend &amp; Create New Contract" states="ongoing" class="btn-success"/>
+                    <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="btn-info"/>
+                    <button name="action_hireoff" states="ongoing" string="Hire off" type="object" class="btn-danger"/>
                     <button name="action_cancel" states="confirm" string="cancel" type="object"/>
                     <field name="state" widget="statusbar" statusbar_visible="confirm,ongoing,hireoff"/>
                 </header>
@@ -132,11 +132,12 @@
                                    attrs="{'readonly': [('state', 'in', ('ongoing', 'hireoff', 'cancel'))]}">
                                 <tree
                                     string="Rental Order Lines"
+                                    decoration-muted="rental_state == 'hireoff'" decoration-success="rental_state == 'active'"
                                 >
                                     <control>
                                         <create name="add_product_control" string="Add a product"/>
                                     </control>
-
+                                    <field name="rental_state" invisible="1"/>
                                     <field name="sequence" widget="handle" />
                                     <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
                                     <field name="product_uom_category_id" invisible="1"/>
@@ -214,6 +215,7 @@
                                     <field name="currency_id" invisible="1"/>
                                     <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
+                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-danger"/>
                                 </tree>
                                 <form>
                                     <!--

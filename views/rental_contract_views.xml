@@ -22,7 +22,7 @@
             <form string="Rental Contracts" class="o_sale_order">
                 <field name="company_id" invisible="1"/>
                 <header>
-                    <button name="create_do" type="object" string="Sign &amp; Create DO" class="oe_highlight"/>
+                    <button name="create_do" type="object" attrs="{'invisible': [('state', '!=', 'draft')]}" string="Sign &amp; Create DO" class="oe_highlight"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,signed,cancel"/>
                 </header>
                 <sheet>
@@ -35,15 +35,16 @@
                         <group name="partner_details">
                             <field name="partner_id" 
                                    widget="res_partner_many2one" 
+                                   attrs="{'readonly': [('state', '!=', 'draft')]}"
                                    context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" 
                                    options='{"always_reload": True}'/> 
-                            <field name="user_id"/>
+                            <field name="user_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                         </group>
                         <group name="order_details">
-                            <field name="order_id"/>
+                            <field name="order_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             <field name="create_date" string="Created Date"/>
-                            <field name="customer_reference" string="Customer Ref." invisible="1"/>
-                            <field name="customer_po_number" invisible="1"/>
+                            <field name="customer_reference" string="Customer Ref." invisible="0" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="customer_po_number" invisible="0" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             <field name="pricelist_id" invisible="1"/>
                         </group>
                     </group>
@@ -64,7 +65,7 @@
                         
                         <!-- Initial Schedule Group -->
                         <group string="Period">
-                            <field name="start_date" string="Start Date"/>
+                            <field name="start_date" string="Start Date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             <field name="end_date" string="End Date" readonly="1"/>
                         </group>
 
@@ -75,7 +76,8 @@
                                    context="{
                                         'default_contract_id': id,
                                    }"
-                                   widget="section_and_note_one2many">
+                                   widget="section_and_note_one2many"
+                                   attrs="{'readonly': [('state', '!=', 'draft')]}">
                                 <tree
                                     string="Rental Order Lines">
                                     <control>

@@ -19,7 +19,7 @@ class RentalContractLine(models.Model):
                                    ondelete='cascade', index=True, copy=False)
     name = fields.Text(string='Description', required=True)
     sequence = fields.Integer(string='Sequence', default=10)
-    item_code = fields.Char(string="Item Code", required=True)
+    item_code = fields.Char(string="Item Code", related="ro_line_id.item_code", required=True)
     product_id = fields.Many2one('product.product', string='Product', 
                                  domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
                                  change_default=True, ondelete='restrict')
@@ -45,7 +45,7 @@ class RentalContractLine(models.Model):
     currency_id = fields.Many2one(related='contract_id.currency_id', depends=['contract_id.currency_id'], store=True, string='Currency')
     order_partner_id = fields.Many2one(related='contract_id.partner_id', store=True, string='Customer', index=True)
     
-    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
+    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], related="ro_line_id.item_type", default='unit', string="Type", required=True)
     start_date = fields.Date(string="Start Date", required=False)
     end_date = fields.Date(string="End Date", compute='_compute_end_date', required=False)
 

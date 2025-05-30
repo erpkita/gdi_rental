@@ -95,7 +95,7 @@ class GDIRentalOrderLine(models.Model):
 
         if self._context.get("default_order_id"):
             order_id = self._context.get("default_order_id")
-            order = self.env["rental.order"].browse(order_id)
+            order = self.env["gdi.rental.order"].browse(order_id)
             if order:
                 res.update({
                     "duration": order.duration,
@@ -326,6 +326,9 @@ class GDIRentalOrderLine(models.Model):
                 contract_line_vals.update({'component_line_ids': component_line_ids})
 
             return contract_line_vals
+        
+    def action_item_hireoff(self):
+        pass
 
 
 

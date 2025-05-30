@@ -7,7 +7,18 @@ class StockPicking(models.Model):
     _order = "scheduled_date desc, id desc"
 
     rental_order_item_ids = fields.One2many("stock.rental.order.item", "picking_id", string="Rental Order Items")
+    gdi_rental_id = fields.Many2one("gdi.rental.order", string="Rental")
+    rental_contract_id = fields.Many2one("rental.contract", string="Contract")
     is_rental_do = fields.Boolean(string="RDO ?", default=False)
+
+    @api.onchange('is_rental_do')
+    def onchange_rental_do(self):
+        default_picking_type = "Delivery Orders"
+        rental_picking_type = self.env["stock.picking.type"].search([('name', '=', "Rental Delivery Orders")], limit=1)
+        if not rental_picking_type:
+            rental_picking_type = self.env["stock.picking.type"].search([('name', '=', default_picking_type)], limit=1)
+        for rec in self:
+            rec.picking_type_id = rental_picking_type.id
 
 class StockRentalOrderItem(models.Model):
     _name = "stock.rental.order.item"
@@ -57,4 +68,18 @@ class StockRentalOrderItem(models.Model):
         ('week', 'weeks'),
         ('month', 'Months')
     ], string="Unit", default='day', required=True)
+
+    @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
+    def _compute_amount(self):
+        """
+        Compute the amounts of the SO line.
+        """
+        for line in self:
+            price = line.price_unit * (1 - (line.discount or 0.0) / 100.0)
+            taxes = line.tax_id.compute_all(price, line.picking_id.currency_id, line.product_uom_qty, product=line.product_id, partner=line.picking_id.partner_id)
+            line.update({
+                'price_tax': sum(t.get('amount', 0.0) for t in taxes.get('taxes', [])),
+                'price_total': taxes['total_included'],
+                'price_subtotal': taxes['total_excluded'],
+            })
   

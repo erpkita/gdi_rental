@@ -10,3 +10,4 @@ access_rental_quotation_component_all,rental.quotation.component all,model_renta
 access_rental_contract_component_all,rental.contract.component all,model_rental_contract_component,,1,1,1,1
 access_rental_contract_creation_wizard_all,rental.contract.creation.wizard all,model_rental_contract_creation_wizard,,1,1,1,1
 access_stock_rental_order_item_all,stock.rental.order.item all,model_stock_rental_order_item,,1,1,1,1
+access_rental_contract_wizard_line_all,rental.contract.wizard.line all,model_rental_contract_wizard_line,,1,1,1,1
