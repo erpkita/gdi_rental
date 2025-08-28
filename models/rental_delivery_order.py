@@ -79,6 +79,8 @@ class StockRentalOrderItem(models.Model):
 
     contract_line_id = fields.Many2one("rental.contract.line", string="Contract Item")
 
+    stock_move_ids = fields.One2many("stock.move", "rental_order_item_id", string="Moves")
+
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
         """

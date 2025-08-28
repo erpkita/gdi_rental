@@ -124,256 +124,118 @@
                     </div>
                 </div>
                 <div class="pt-3"/>
-                <div class="row" style="font-size:14px;">
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 9px;">
-                        <thead>
+                <table class="table-sm" style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 14px;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 5%;">No</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 45%;">Item Description</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 8%;">UOM</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 8%;">Quantity</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 34%;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Loop through rental_order_item_ids -->
+                        <t t-set="item_counter" t-value="1"/>
+                        <t t-foreach="o.rental_order_item_ids" t-as="rental_item">
+                            <!-- Main Item Row -->
                             <tr>
-                                <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 5%;">No</th>
-                                <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 45%;">Item Description</th>
-                                <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 8%;">UOM</th>
-                                <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 8%;">Quantity</th>
-                                <th style="border: 1px solid #000; padding: 5px; text-align: center; background-color: #f0f0f0; font-weight: bold; width: 34%;">Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Item 1 -->
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">1</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;">
-                                    <strong>ARC WELDING TRANSFORMER; 500-750<br/>
-                                    AMP(462-1); XLCATM500; GDI-RENTAL;</strong>
+                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">
+                                    <span t-esc="item_counter"/>
                                 </td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">SET</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">5</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;"></td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px;" colspan="5">
-                                    <div style="margin: 5px 0;">
-                                        <strong>ZRT-GDR-1168 [GDILTM500]</strong><br/>
-                                        Power Source Welding, Multi Process<br/>
-                                        <em>Source Location : WH/GDI Physical Location/RSC/ RentalServiceCentre_Stock</em>
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">125058</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">AC157082/NO.01</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">2</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">125058</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">AC157082/NO.02</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">3</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">125058</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">AC157082/NO.03</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">4</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">125058</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">AC157082/NO.04</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">5</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">125058</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">AC157082/NO.05</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                    
-                                    <div style="margin: 10px 0 5px 0;">
-                                        <strong>ZRT-LCU-0001 [GDILWF24-]</strong><br/>
-                                        Wire Feeder LWF24<br/>
-                                        <em>Source Location : WH/GDI Physical Location/RSC/ RentalServiceCentre_Stock</em>
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">215151</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">LW24010002</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                    
-                                    <div style="margin: 10px 0 5px 0;">
-                                        <strong>ZRT-GDR-1281 [GDICCBLASSY096]</strong><br/>
-                                        INTERCONNECTION CABLE; CABLE WELDING+HOSE, 1.5 MM X 7 CORE, 20MTR; GDI-RENTAL<br/>
-                                        <em>Source Location : WH/GDI Physical Location/RSC/ RentalServiceCentre_Stock</em>
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">151541</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">-</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">5 set</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;">
+                                    <strong t-esc="rental_item.name or rental_item.product_id.name"/>
+                                </td>
+                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">
+                                    <span t-esc="rental_item.product_uom.name"/>
+                                </td>
+                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">
+                                    <span t-esc="int(rental_item.product_uom_qty)"/>
+                                </td>
+                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;">
+                                    <!-- <span t-esc="rental_item.note or ''"/> -->
                                 </td>
                             </tr>
                             
-                            <!-- Item 2 -->
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">2</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;">
-                                    <strong>ZRT-GDR-1138 [GDICV500P2---]<br/>
-                                    SKU 225012<br/>
-                                    Machine,Inverter,Welder, SET; C/W Remote,<br/>
-                                    Connector, CV-500P; GDI-RENTAL;</strong>
-                                </td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">UNT</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">1</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;"></td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px;" colspan="5">
-                                    <div style="margin: 5px 0;">
-                                        <strong>ZRT-GDR-1138 [GDICV500P2---]</strong><br/>
-                                        Machine,Inverter,Welder,; C/W Remote, Connector, CV-500P; GDI-RENTAL;<br/>
-                                        <em>Source Location : WH/GDI Physical Location/RSC/ RentalServiceCentre_Stock</em>
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">225012</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">Z1181001075SET/NO.19</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                            
-                            <!-- Item 3 -->
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">3</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;">
-                                    <strong>ZRT-GDR-1139 [GDICV500P3---]<br/>
-                                    Machine,Inverter,Welder, Without Remote,<br/>
-                                    CV-500P; GDI-RENTAL;</strong>
-                                </td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">UNT</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; text-align: center; vertical-align: top;">3</td>
-                                <td style="border: 1px solid #000; padding: 3px 5px; vertical-align: top;"></td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 3px 5px;" colspan="5">
-                                    <div style="margin: 5px 0;">
-                                        <strong>ZRT-GDR-1139 [GDICV500P3---]</strong><br/>
-                                        Machine,Inverter,Welder,;Without Remote, CV-500P; GDI-RENTAL;<br/>
-                                        <em>Source Location : WH/GDI Physical Location/RSC/ RentalServiceCentre_Stock</em>
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
-                                                <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">225013</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">Z1181001075SET/NO.20</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">2</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">225013</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">Z1181001075SET/NO.21</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">3</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">225013</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">Z1181001075SET/NO.22</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1 unit</td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                                <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                            <!-- Detail Rows for each stock_move_id -->
+                            <t t-foreach="rental_item.stock_move_ids" t-as="stock_move">
+                                <tr>
+                                    <td style="border: 1px solid #000; padding: 3px 5px;" colspan="5">
+                                        <div style="margin: 5px 0;">
+                                            <strong>
+                                                <span t-esc="stock_move.name or stock_move.product_id.item_code_ref or ''"/>
+                                                <t t-if="stock_move.product_id.item_code_ref"> [<span t-esc="stock_move.product_id.item_code_ref"/>]</t>
+                                            </strong><br/>
+                                            <span t-esc="stock_move.product_id.name"/><br/>
+                                            <em>Source Location : <span t-esc="stock_move.location_id.display_name"/></em>
+                                        </div>
+                                        
+                                        <!-- Detail table for moveline_ids -->
+                                        <table style="width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 8px;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 8%;">No</th>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 15%;">SKU</th>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 25%;">Lot/SN.</th>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty delivered</th>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 13%;">Qty returned</th>
+                                                    <th style="border: 1px solid #666; padding: 2px; text-align: center; background-color: #e8e8e8; font-size: 8px; width: 26%;">Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Loop through moveline_ids -->
+                                                <t t-set="line_counter" t-value="1"/>
+                                                <t t-foreach="stock_move.move_line_ids" t-as="move_line">
+                                                    <tr>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="line_counter"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="move_line.product_id.item_code_ref or ''"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="move_line.lot_id.name or move_line.lot_name or '-'"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="int(move_line.product_qty or move_line.qty_done)"/>
+                                                            <span t-esc="move_line.product_uom_id.name"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <!-- Qty returned - you may need to adjust this field based on your model -->
+                                                            <span t-esc="move_line.qty_returned or ''"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="move_line.note or ''"/>
+                                                        </td>
+                                                    </tr>
+                                                    <t t-set="line_counter" t-value="line_counter + 1"/>
+                                                </t>
+                                                
+                                                <!-- Handle case where no moveline_ids exist -->
+                                                <t t-if="not stock_move.moveline_ids">
+                                                    <tr>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">1</td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="stock_move.product_id.default_code or ''"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">-</td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;">
+                                                            <span t-esc="int(stock_move.product_qty or stock_move.quantity_done)"/>
+                                                            <span t-esc="stock_move.product_uom.name"/>
+                                                        </td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
+                                                        <td style="border: 1px solid #666; padding: 2px; text-align: center; font-size: 8px;"></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </t>
+                            <t t-set="item_counter" t-value="item_counter + 1"/>
+                        </t>
+                    </tbody>
+                </table>
             </div>
         </t>
     </template>
