@@ -130,6 +130,8 @@
                 <div class="oe_button_box" name="button_box">
                     <field name="has_scrap_move" invisible="True"/>
                     <field name="has_tracking" invisible="True"/>
+                    <button name="action_print_rental_picking_list" string=" Picking List"
+                        class="oe_state_button" icon="fa-print" type="object"/>
                     <button name="action_see_move_scrap" string="Scraps" type="object"
                         class="oe_stat_button" icon="fa-arrows-v"
                         attrs="{'invisible': [('has_scrap_move', '=', False)]}"/>
@@ -180,6 +182,7 @@
                         <field name="location_id" options="{'no_create': True}" groups="stock.group_stock_multi_locations" attrs="{'invisible': [('picking_type_code', '=', 'incoming')]}"/>
                         <field name="location_dest_id" options="{'no_create': True}" groups="stock.group_stock_multi_locations" attrs="{'invisible': [('picking_type_code', '=', 'outgoing')]}"/>
                         <field name="backorder_id" attrs="{'invisible': [('backorder_id','=',False)]}"/>
+                        <!-- <button name="action_print_rental_picking_list" type="object" class="btn-info" icon="" -->
                     </group>
                     <group>
                         <label for="scheduled_date"/>

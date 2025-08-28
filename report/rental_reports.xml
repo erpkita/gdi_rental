@@ -12,6 +12,17 @@
             <field name="binding_model_id" ref="model_rental_quotation"/>
             <field name="binding_type">report</field>
         </record>
+
+        <record id="gdi_action_report_rental_picking_list" model="ir.actions.report">
+            <field name="name">Rental Picking List</field>
+            <field name="model">stock.picking</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">gdi_rental.report_rental_picking_list</field>
+            <field name="report_file">gdi_rental.report_rental_picking_list</field>
+            <field name="print_report_name">'Rental Picking List (%s)' % (object.name)</field>
+            <field name="binding_model_id" ref="model_stock_picking"/>
+            <field name="binding_type">report</field>
+        </record>
     </data>
 
 </odoo>

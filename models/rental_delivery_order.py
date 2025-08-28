@@ -20,6 +20,14 @@ class StockPicking(models.Model):
         for rec in self:
             rec.picking_type_id = rental_picking_type.id
 
+    def action_print_rental_picking_list(self):
+        return self.env.ref("gdi_rental.gdi_action_report_rental_picking_list").report_action(self) 
+
+class StockMove(models.Model):
+    _inherit = "stock.move"
+    
+    rental_order_item_id = fields.Many2one("stock.rental.order.item", string="Rental Order Item")
+
 class StockRentalOrderItem(models.Model):
     _name = "stock.rental.order.item"
 
@@ -68,6 +76,8 @@ class StockRentalOrderItem(models.Model):
         ('week', 'weeks'),
         ('month', 'Months')
     ], string="Unit", default='day', required=True)
+
+    contract_line_id = fields.Many2one("rental.contract.line", string="Contract Item")
 
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):

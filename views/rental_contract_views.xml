@@ -22,7 +22,7 @@
             <form string="Rental Contracts" class="o_sale_order">
                 <field name="company_id" invisible="1"/>
                 <header>
-                    <button name="create_do" type="object" attrs="{'invisible': [('state', '!=', 'draft')]}" string="Sign &amp; Create DO" class="oe_highlight"/>
+                    <button name="create_do" type="object" attrs="{'invisible': [('state', '!=', 'draft')]}" string="Confirm &amp; Create DO" class="oe_highlight"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,signed,cancel"/>
                 </header>
                 <sheet>

@@ -291,7 +291,6 @@ class RentalQuotation(models.Model):
 
         self.update(values)
 
-
     def action_cancel(self):
         for rec in self:
             rec.write({
@@ -311,6 +310,12 @@ class RentalQuotation(models.Model):
             rec.write({
                 'state': 'sent'
             })
+
+    def unlink(self):
+        for rec in self:
+            if rec.name:
+                raise UserError(_('Unable to delete document with number already generated..'))
+        return super(RentalQuotation, self).unlink()
 
     def _prepare_rental_order(self):
         partner = self.partner_id

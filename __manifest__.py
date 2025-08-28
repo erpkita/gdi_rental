@@ -28,6 +28,7 @@
         'data/gdi_rental_sequence.xml',
         # 'data/gdi_rental_picking_type.xml',
         'report/rental_quotation_templates.xml',
+        'report/rental_picking_list.xml',
         'report/rental_reports.xml',
         'wizard/views/rental_contract_creation_wizard_views.xml',
         'views/product_views.xml',

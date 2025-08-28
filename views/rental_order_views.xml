@@ -27,9 +27,7 @@
                 <field name="id" invisible="1"/>
                 <field name="contract_id" invisible="1"/>
                 <header>
-                    <!-- <button name="action_start_rental" states="confirm" string="Start Rental" type="object" class="oe_highlight"/> -->
-                    <!-- <button name="action_generate_contract" states="confirm" string="Generate Contract" type="object" class="oe_highlight"/> -->
-                    <button name="action_start_rental" type="object" string="Create Contract" states="confirm" class="btn-primary" confirm="Please make sure the rental period are properly setup."/>
+                    <button name="action_start_rental" type="object" string="Start Rental" states="confirm" class="btn-primary" confirm="Are you absolutely sure?, Please double-check the rental period, customer details, and terms before proceeding."/>
                     <button name="action_create_contract" type="object" string="Extend &amp; Create New Contract" states="ongoing" class="btn-success"/>
                     <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="btn-info"/>
                     <button name="action_hireoff" states="ongoing" string="Hire off" type="object" class="btn-danger"/>
@@ -115,6 +113,7 @@
                         <group string="Contract" attrs="{'invisible': [('contract_id', '=', False)]}">
                             <button name="open_related_contract"
                                     type="object"
+                                    icon="fa-file-text-o"
                                     string="View Contract"
                                     class="btn btn-primary"/>
                         </group>
@@ -215,7 +214,7 @@
                                     <field name="currency_id" invisible="1"/>
                                     <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
-                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-danger"/>
+                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-danger" attrs="{'column_invisible': [('parent.state', '!=', 'active')]}"/>
                                 </tree>
                                 <form>
                                     <!--

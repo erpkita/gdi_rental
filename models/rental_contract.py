@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from dateutil.relativedelta import relativedelta
+import datetime
+
+_logger = logging.getLogger(__name__)
+
 
 class RentalContract(models.Model):
     _name = "rental.contract"
@@ -158,89 +163,378 @@ class RentalContract(models.Model):
 
         self.update(values)
 
-    def create_do(self):
-        for rec in self:
-            picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Rental Delivery Orders')], limit=1)
-            if not picking_type_id:
-                picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Delivery Orders')], limit=1)
-            warehouse_id = picking_type_id.warehouse_id
-            stock_picking_vals = {
-                'partner_id': rec.partner_id.id or False,
-                'contact_person_id': rec.partner_id.id or False,
-                'is_rental_do': True,
-                'gdi_rental_id': rec.order_id.id or False,
-                'rental_contract_id': rec.id or False,
-                'picking_type_id': picking_type_id.id or False,
-                'origin': rec.name,
-                'customer_po': rec.customer_po_number,
-                'move_type': 'direct',
-                'location_id': picking_type_id.default_location_src_id.id or False,
-                'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-                'src_user_id': rec.user_id.id or False,
-                'scheduled_date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'date_deadline': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'date_done': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            rental_item_ids = []
-            move_line_ids = []
-            for item in rec.contract_line_ids:
-                rental_item_ids.append((
-                    0, 0, {
-                        'name': item.name or '',
-                        'item_code': item.item_code or '',
-                        'sequence': item.sequence or '',
-                        'product_id': item.product_id.id or False,
-                        'product_template_id': item.product_template_id.id or False,
-                        'product_uom_qty': item.product_uom_qty or 1.0,
-                        'product_uom': item.product_uom.id or False,
-                        'product_uom_category_id': item.product_uom_category_id.id or False,
-                        'product_uom_txt': item.product_uom_txt or 'SET',
-                        'price_unit': item.price_unit or 0.0,
-                        'start_date': item.start_date or False,
-                        'end_date': item.end_date or False,
-                        'duration': item.duration or False,
-                        'duration_unit': item.duration_unit or False,
-                    }
-                ))
+    # def create_do(self):
+    #     for rec in self:
+    #         picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Rental Delivery Orders')], limit=1)
+    #         if not picking_type_id:
+    #             picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Delivery Orders')], limit=1)
+    #         warehouse_id = picking_type_id.warehouse_id
+    #         stock_picking_vals = {
+    #             'partner_id': rec.partner_id.id or False,
+    #             'contact_person_id': rec.partner_id.id or False,
+    #             'is_rental_do': True,
+    #             'gdi_rental_id': rec.order_id.id or False,
+    #             'rental_contract_id': rec.id or False,
+    #             'picking_type_id': picking_type_id.id or False,
+    #             'origin': rec.name,
+    #             'customer_po': rec.customer_po_number,
+    #             'move_type': 'direct',
+    #             'location_id': picking_type_id.default_location_src_id.id or False,
+    #             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
+    #             'src_user_id': rec.user_id.id or False,
+    #             'scheduled_date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #             'date_deadline': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #             'date_done': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #         }
 
-                if item.item_type != 'set':
-                    move_line_ids.append((0,0, {
-                        'sequence_number': item.sequence,
-                        'name': item.name,
-                        'description_picking': item.name,
-                        'product_id': item.product_id.id or False,
-                        'product_uom': item.product_uom.id or False,
-                        'location_id':picking_type_id.default_location_src_id.id or False,
-                        'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-                        'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'price_unit': item.price_unit,
-                        'product_uom_qty': item.product_uom_qty
-                    }))
-                else:
-                    for comp in item.component_line_ids:
-                        move_line_ids.append((0,0, {
-                            'sequence_number': item.sequence,
-                            'name': comp.product_id.product_name,
-                            'description_picking': comp.product_id.product_name,
-                            'product_id': comp.product_id.id or False,
-                            'product_uom': comp.product_uom.id or False,
-                            'location_id':picking_type_id.default_location_src_id.id or False,
-                            'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-                            'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'price_unit': comp.price_unit,
-                            'product_uom_qty': comp.product_uom_qty
-                        }))
+    #         rental_item_ids = []
+    #         for item in rec.contract_line_ids:
+    #             rental_item_ids.append((
+    #                 0, 0, {
+    #                     'name': item.name or '',
+    #                     'item_code': item.item_code or '',
+    #                     'sequence': item.sequence or '',
+    #                     'contract_line_id': item.id,
+    #                     'product_id': item.product_id.id or False,
+    #                     'product_template_id': item.product_template_id.id or False,
+    #                     'product_uom_qty': item.product_uom_qty or 1.0,
+    #                     'product_uom': item.product_uom.id or False,
+    #                     'product_uom_category_id': item.product_uom_category_id.id or False,
+    #                     'product_uom_txt': item.product_uom_txt or 'SET',
+    #                     'price_unit': item.price_unit or 0.0,
+    #                     'start_date': item.start_date or False,
+    #                     'end_date': item.end_date or False,
+    #                     'duration': item.duration or False,
+    #                     'duration_unit': item.duration_unit or False,
+    #                 }
+    #             ))
+    #         stock_picking_vals.update({
+    #             'rental_order_item_ids': rental_item_ids
+    #         })
+    #         try :
+    #             picking_id = self.env["stock.picking"].create(stock_picking_vals)
 
-                item.ro_line_id.update({
-                    'rental_state': 'active'
-                })
+    #             for rental_item in picking_id.rental_order_item_ids:
+    #                 item = rental_item.contract_line_id
+    #                 item_type = item.item_type
 
-            stock_picking_vals.update({
-                'move_ids_without_package': move_line_ids,
-                'rental_order_item_ids': rental_item_ids})
+    #                 if item_type != 'set':
+    #                     self.env["stock.move"].create({
+    #                         'sequence_number': item.sequence,
+    #                         'name': item.name,
+    #                         'description_picking': item.name,
+    #                         'product_id': item.product_id.id or False,
+    #                         'product_uom': item.product_uom.id or False,
+    #                         'location_id': picking_type_id.default_location_src_id.id or False,
+    #                         'location_dest_id': rec.partner_id.property_stock_customer.id or False,
+    #                         'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #                         'price_unit': item.price_unit,
+    #                         'product_uom_qty': item.product_uom_qty,
+    #                         'picking_id': picking_id.id,
+    #                         'rental_order_item_id': rental_item.id
+    #                     })
+    #                 else:
+    #                     for comp in item.component_line_ids:
+    #                         self.env["stock.move"].create({
+    #                             'sequence_number': item.sequence,
+    #                             'name': comp.product_id.product_name,
+    #                             'description_picking': comp.product_id.product_name,
+    #                             'product_id': comp.product_id.id or False,
+    #                             'product_uom': comp.product_uom.id or False,
+    #                             'location_id':picking_type_id.default_location_src_id.id or False,
+    #                             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
+    #                             'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #                             'price_unit': comp.price_unit,
+    #                             'product_uom_qty': comp.product_uom_qty,
+    #                             'rental_order_item_id': rental_item.id,
+    #                             'picking_id': picking_id.id
+    #                         })
+                    
+    #                 item.ro_line_id.update({
+    #                     'rental_state': 'active'
+    #                 })
+
+    #         except Exception:
+    #             raise ValidationError("Error")
+
+    #         rec.write({
+    #             'state': 'signed'
+    #         })
+
+            # move_line_ids = []
+
+            # for item in rec.contract_line_ids:
+
+            #     if item.item_type != 'set':
+            #         move_line_ids.append((0,0, {
+            #             'sequence_number': item.sequence,
+            #             'name': item.name,
+            #             'description_picking': item.name,
+            #             'product_id': item.product_id.id or False,
+            #             'product_uom': item.product_uom.id or False,
+            #             'location_id':picking_type_id.default_location_src_id.id or False,
+            #             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
+            #             'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            #             'price_unit': item.price_unit,
+            #             'product_uom_qty': item.product_uom_qty
+            #         }))
+            #     else:
+            #         for comp in item.component_line_ids:
+            #             move_line_ids.append((0,0, {
+            #                 'sequence_number': item.sequence,
+            #                 'name': comp.product_id.product_name,
+            #                 'description_picking': comp.product_id.product_name,
+            #                 'product_id': comp.product_id.id or False,
+            #                 'product_uom': comp.product_uom.id or False,
+            #                 'location_id':picking_type_id.default_location_src_id.id or False,
+            #                 'location_dest_id': rec.partner_id.property_stock_customer.id or False,
+            #                 'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            #                 'price_unit': comp.price_unit,
+            #                 'product_uom_qty': comp.product_uom_qty
+            #             }))
+
+            #     item.ro_line_id.update({
+            #         'rental_state': 'active'
+            #     })
+
+            # stock_picking_vals.update({
+            #     'move_ids_without_package': move_line_ids,
+            #     'rental_order_item_ids': rental_item_ids})
             
-            picking_id = self.env['stock.picking'].create(stock_picking_vals)
+            # picking_id = self.env['stock.picking'].create(stock_picking_vals)
 
-            rec.write({
-                'state': 'signed'
-            })
+    def create_do(self):
+        """
+        Create delivery orders for rental contracts.
+        
+        Returns:
+            recordset: Created stock.picking records
+        
+        Raises:
+            UserError: When required picking type is not found
+            ValidationError: When delivery order creation fails
+        """
+        if not self:
+            return self.env['stock.picking']
+        
+        created_pickings = self.env['stock.picking']
+        
+        for contract in self:
+            # try:
+            picking = self._create_single_delivery_order(contract)
+            if picking:
+                created_pickings |= picking
+                # Update contract state only after successful creation
+                contract.write({'state': 'signed'})
+            # except Exception as e:
+            #     _logger.error(f"Failed to create delivery order for contract {contract.name}: {str(e)}")
+            #     raise ValidationError(
+            #         _("Failed to create delivery order for contract %s. Error: %s") % (contract.name, str(e))
+            #     )
+        
+        return created_pickings
+
+    def _create_single_delivery_order(self, contract):
+        """
+        Create a single delivery order for a rental contract.
+        
+        Args:
+            contract: rental contract record
+            
+        Returns:
+            stock.picking: Created picking record
+        """
+        picking_type = self._get_picking_type()
+        if not picking_type:
+            raise UserError(_("No suitable picking type found for rental delivery orders"))
+        
+        # Create the main picking record
+        picking_vals = self._prepare_picking_vals(contract, picking_type)
+        picking = self.env["stock.picking"].create(picking_vals)
+        
+        # Create stock moves for all items
+        self._create_stock_moves(contract, picking, picking_type)
+        
+        return picking
+
+    def _get_picking_type(self):
+        """Get the appropriate picking type for rental deliveries."""
+        PickingType = self.env['stock.picking.type']
+        
+        # Try rental-specific picking type first
+        picking_type = PickingType.search([('name', '=', 'Rental Delivery Orders')], limit=1)
+        
+        if not picking_type:
+            # Fallback to general delivery orders
+            picking_type = PickingType.search([('name', '=', 'Delivery Orders')], limit=1)
+        
+        return picking_type
+
+    def _prepare_picking_vals(self, contract, picking_type):
+        """
+        Prepare values for creating stock picking record.
+        
+        Args:
+            contract: rental contract record
+            picking_type: stock.picking.type record
+            
+        Returns:
+            dict: Values for stock.picking creation
+        """
+        current_datetime = fields.Datetime.now()
+        
+        picking_vals = {
+            'partner_id': contract.partner_id.id,
+            'contact_person_id': contract.partner_id.id,
+            'is_rental_do': True,
+            'gdi_rental_id': contract.order_id.id,
+            'rental_contract_id': contract.id,
+            'picking_type_id': picking_type.id,
+            'origin': contract.name,
+            'customer_po': contract.customer_po_number,
+            'move_type': 'direct',
+            'location_id': picking_type.default_location_src_id.id,
+            'location_dest_id': contract.partner_id.property_stock_customer.id,
+            'src_user_id': contract.user_id.id,
+            'scheduled_date': current_datetime,
+            'date_deadline': current_datetime,
+            # Don't set date_done for draft pickings - it should be set when actually done
+        }
+        
+        # Add rental items
+        rental_items = self._prepare_rental_items(contract)
+        picking_vals['rental_order_item_ids'] = rental_items
+        
+        return picking_vals
+
+    def _prepare_rental_items(self, contract):
+        """
+        Prepare rental order items from contract lines.
+        Use the same simple approach that worked in the old code.
+        
+        Args:
+            contract: rental contract record
+            
+        Returns:
+            list: List of tuples for creating rental order items
+        """
+        rental_items = []
+        
+        for line in contract.contract_line_ids:
+            item_vals = {
+                'name': line.name or '',
+                'item_code': line.item_code or '',
+                'sequence': line.sequence or 0,
+                'contract_line_id': line.id,
+                'product_id': line.product_id.id,
+                'product_template_id': line.product_template_id.id,
+                'product_uom_qty': line.product_uom_qty or 1.0,
+                'product_uom': line.product_uom.id,
+                'product_uom_category_id': line.product_uom_category_id.id,
+                'product_uom_txt': line.product_uom_txt or 'SET',
+                'price_unit': line.price_unit or 0.0,
+                # Use the same simple approach as the old working code
+                'start_date': line.start_date or False,
+                'end_date': line.end_date or False,
+                'duration': line.duration,
+                'duration_unit': line.duration_unit,
+            }
+            rental_items.append((0, 0, item_vals))
+        
+        return rental_items
+
+    def _create_stock_moves(self, contract, picking, picking_type):
+        """
+        Create stock moves for rental items.
+        
+        Args:
+            contract: rental contract record
+            picking: stock.picking record
+            picking_type: stock.picking.type record
+        """
+        current_datetime = fields.Datetime.now()
+        
+        for rental_item in picking.rental_order_item_ids:
+            contract_line = rental_item.contract_line_id
+            
+            if contract_line.item_type != 'set':
+                # Create single move for non-set items
+                self._create_stock_move(
+                    contract_line, contract, picking, picking_type, 
+                    rental_item, current_datetime
+                )
+            else:
+                # Create moves for set components
+                self._create_set_component_moves(
+                    contract_line, contract, picking, picking_type, 
+                    rental_item, current_datetime
+                )
+            
+            # Update rental order line state
+            if contract_line.ro_line_id:
+                contract_line.ro_line_id.write({'rental_state': 'active'})
+
+    def _create_stock_move(self, contract_line, contract, picking, picking_type, 
+                        rental_item, current_datetime, component=None):
+        """
+        Create a single stock move.
+        
+        Args:
+            contract_line: contract line record
+            contract: rental contract record
+            picking: stock.picking record
+            picking_type: stock.picking.type record
+            rental_item: rental order item record
+            current_datetime: current datetime
+            component: component record (for set items)
+        """
+        if component:
+            # For set components
+            product = component.product_id
+            name = product.product_name or product.name
+            price_unit = component.price_unit or 0.0
+            qty = component.product_uom_qty or 1.0
+            uom = component.product_uom
+        else:
+            # For regular items
+            product = contract_line.product_id
+            name = contract_line.name or product.name
+            price_unit = contract_line.price_unit or 0.0
+            qty = contract_line.product_uom_qty or 1.0
+            uom = contract_line.product_uom
+        
+        move_vals = {
+            'sequence_number': contract_line.sequence or 0,
+            'name': name,
+            'description_picking': name,
+            'product_id': product.id,
+            'product_uom': uom.id,
+            'location_id': picking_type.default_location_src_id.id,
+            'location_dest_id': contract.partner_id.property_stock_customer.id,
+            'date': current_datetime,
+            'price_unit': price_unit,
+            'product_uom_qty': qty,
+            'picking_id': picking.id,
+            'rental_order_item_id': rental_item.id,
+        }
+        
+        return self.env["stock.move"].create(move_vals)
+
+    def _create_set_component_moves(self, contract_line, contract, picking, 
+                                picking_type, rental_item, current_datetime):
+        """
+        Create stock moves for set components.
+        
+        Args:
+            contract_line: contract line record
+            contract: rental contract record
+            picking: stock.picking record
+            picking_type: stock.picking.type record
+            rental_item: rental order item record
+            current_datetime: current datetime
+        """
+        for component in contract_line.component_line_ids:
+            self._create_stock_move(
+                contract_line, contract, picking, picking_type,
+                rental_item, current_datetime, component=component
+            )

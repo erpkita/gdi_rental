@@ -409,7 +409,7 @@ class GdiRentalOrder(models.Model):
             if not contract_id:
                 raise ValidationError(_("Error while creating contract. Please contact administrator !"))
             
-            # auto sign the contract becaus its first rental and we expect to auto generate DO.
+            # auto sign the contract because its first rental and we expect to auto generate DO.
             contract_id.create_do()
 
             rec.write({
