@@ -10,12 +10,12 @@
                 <div class="oe_structure"/>
                 <div class="pt-3"/>
                 <div class="row">
-                    <div class="col-12" style="text-align:center; font-size:15px;">
+                    <div class="col-12" style="text-align:center; font-size:14px;">
                         <span>RENTAL PICKING LIST</span>
                     </div>
                 </div>
                 <div class="pt-3"/>
-                <div class="row" style="font-size:14px;">
+                <div class="row" style="font-size:12px;">
                     <div class="col-7">
                         <table width="100%">
                             <t t-if="o.gdi_rental_id">
@@ -25,9 +25,9 @@
                                         <td style="width:24%;">Vendor</td>
                                     </t>
                                     <t t-else="">
-                                        <td style="width:24%;">Customer Name</td>
+                                        <td style="width:23%;">Customer Name</td>
                                     </t>
-                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td style="width:1%;">:&#160;&#160;</td>
                                     <td><span t-esc="partner_sale.partner_ref_no"/></td>
                                 </tr>
                                 <tr>
@@ -49,9 +49,9 @@
                                         <td style="width:24%;">Vendor</td>
                                     </t>
                                     <t t-else="">
-                                        <td style="width:24%;">Customer Name</td>
+                                        <td style="width:23%;">Customer Name</td>
                                     </t>
-                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td style="width:0%;">:&#160;&#160;</td>
                                     <td>
                                         <t t-if="partner.is_company">
                                             <span t-esc="partner.partner_ref_no"/>
@@ -243,6 +243,79 @@
                         </t>
                     </tbody>
                 </table>
+
+                <div style="page-break-inside: avoid;page-break-before: auto;page-break-after:avoid;">
+                    <div style="margin-top: 20px; margin-bottom: 15px;">
+                        <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">
+                            Special Instruction/Notes :
+                        </div>
+                        <div style="border-bottom: 1px solid #000; height: 40px; margin-bottom: 3px;"></div>
+                    </div>
+                </div>
+
+                <div style="page-break-inside: avoid;page-break-before: auto;page-break-after:avoid;">
+                    <div style="margin-top: 25px; margin-bottom: 20px; font-size: 11px; line-height: 1.4;">
+                        <div style="font-weight: bold; margin-bottom: 8px;">
+                            Customer Acknowledgement
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            I, the undersigned, acknowledge the condition of the equipment at both delivery and return. I understand that any damages may incur additional charges.
+                        </div>
+                        
+                        <!-- Signature Fields Table -->
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                            <tr>
+                                <td style="width: 33%; padding: 8px 4px; font-size: 11px;">
+                                    Customer Signature at delivery: _________________
+                                </td>
+                                <td style="width: 33%; padding: 8px 4px; font-size: 11px; text-align: center;">
+                                    Company Stamp: ________________
+                                </td>
+                                <td style="width: 34%; padding: 8px 4px; font-size: 11px; text-align: right;">
+                                    Date: ________________
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width: 33%; padding: 8px 4px; font-size: 11px;">
+                                    Customer Signature at return: ___________________
+                                </td>
+                                <td style="width: 33%; padding: 8px 4px; font-size: 11px; text-align: center;">
+                                    Company Stamp: ________________
+                                </td>
+                                <td style="width: 34%; padding: 8px 4px; font-size: 11px; text-align: right;">
+                                    Date: ________________
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="page-break-inside: avoid;page-break-before: auto;page-break-after:avoid;">
+                    <div style="margin: 20px 0; border-top: 2px dashed #000;"></div>
+
+                    <div style="margin-top: 20px; font-size: 12px; line-height: 1.4;">
+                        <div style="font-weight: bold; margin-bottom: 8px;">
+                            Equipment Owner Representative
+                        </div>
+                        <div style="font-weight: bold; margin-bottom: 12px;">
+                            PT. GREAT DYNAMIC INDONESIA
+                        </div>
+                        
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 35%; padding: 10px 4px; font-size: 12px;">
+                                    Name: ____________________________
+                                </td>
+                                <td style="width: 30%; padding: 10px 4px; font-size: 12px; text-align: center;">
+                                    Signature: ______________________
+                                </td>
+                                <td style="width: 35%; padding: 10px 4px; font-size: 12px; text-align: right;">
+                                    Date: ____________________________
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
             </div>
         </t>
     </template>
