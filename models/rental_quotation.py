@@ -136,6 +136,16 @@ class RentalQuotation(models.Model):
     inverse="_inverse_duration",
     store=True
     )
+    
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        string='Warehouse',
+        required=True,
+        check_company=True,
+        default=lambda self: self.env['stock.warehouse'].search([
+            ('company_id', '=', self.env.company.id)
+        ], limit=1)
+    )
 
     @api.depends('start_date', 'duration', 'duration_unit')
     def _compute_end_date(self):
@@ -312,9 +322,9 @@ class RentalQuotation(models.Model):
             })
 
     def unlink(self):
-        for rec in self:
-            if rec.name:
-                raise UserError(_('Unable to delete document with number already generated..'))
+        # for rec in self:
+        #     if rec.name:
+        #         raise UserError(_('Unable to delete document with number already generated..'))
         return super(RentalQuotation, self).unlink()
 
     def _prepare_rental_order(self):

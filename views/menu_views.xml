@@ -34,15 +34,15 @@
             name="Rental Equipment"
             sequence="40">
 
-            <menuitem 
+            <!-- <menuitem 
                 id="gdi_menu_rental_products" 
                 name="Products" 
                 sequence="1" 
-                action="gdi_rental.gdi_rental_product_template_action" />
+                action="gdi_rental.gdi_rental_product_template_action" /> -->
 
             <menuitem 
                 id="gdi_menu_rental_products_variant" 
-                name="Products Variant" 
+                name="Rental Items" 
                 sequence="2" 
                 action="gdi_rental.gdi_rental_product_product_action" />
 

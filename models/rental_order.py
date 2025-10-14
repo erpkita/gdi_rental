@@ -132,6 +132,16 @@ class GdiRentalOrder(models.Model):
     effective_end_date = fields.Date(string="Effective End Date")
     contract_id = fields.Many2one("rental.contract", string="Active Contract")
 
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        string='Warehouse',
+        required=True,
+        check_company=True,
+        default=lambda self: self.env['stock.warehouse'].search([
+            ('company_id', '=', self.env.company.id)
+        ], limit=1)
+    )
+
     @api.depends('duration', 'duration_unit')
     def _compute_duration_str(self):
         for record in self:

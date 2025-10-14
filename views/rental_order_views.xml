@@ -64,12 +64,6 @@
                             <label for="pricelist_id" groups="product.group_product_pricelist"/>
                             <div groups="product.group_product_pricelist" class="o_row">
                                 <field name="pricelist_id" options="{'no_open':True,'no_create': True}"/>
-                                <!-- <button name="update_prices" type="object"
-                                    string=" Update Prices"
-                                    help="Recompute all prices based on this pricelist"
-                                    class="btn-link mb-1 px-0" icon="fa-refresh"
-                                    confirm="This will update all unit prices based on the currently set pricelist."
-                                    attrs="{'invisible': ['|', ('show_update_pricelist', '=', False), ('state', 'in', ['sale', 'done','cancel'])]}"/> -->
                             </div>
                             <field name="currency_id" invisible="1"/>
                             <field name="customer_reference"/>
@@ -78,13 +72,6 @@
                                    options="{'no_create': True}" 
                                    groups="base.group_multi_company"
                                    invisible="1"/>
-                            <!-- <field name="date_definition_level" string="Date Definition Lvl."/>
-                            <label for="start_date" string="Rental Period" attrs="{'invisible': [('date_definition_level', '=', 'item')]}"/>
-                            <div class="o_row" attrs="{'invisible': [('date_definition_level', '=', 'item')]}">
-                                <field name="start_date" attrs="{'required': [('date_definition_level', '=', 'order')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_end_date': 'end_date'}"/>
-                                <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                <field name="end_date" attrs="{'required': [('date_definition_level', '=', 'order')]}" widget="daterange" nolabel="1" class="oe_inline" options="{'related_start_date': 'start_date'}"/>
-                            </div> -->
                         </group>
                     </group>
                     <group string="Rental Schedule Overview">
@@ -92,7 +79,6 @@
                         <!-- Active Schedule Group -->
                         <group string="Active Duration">
                             <label for="duration"/>
-                            <!-- Info box above the fields, not wrapping them -->
                             <div class="o_row">
                                 <field name="duration" attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
                                 <field name="duration_unit" attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
@@ -136,9 +122,18 @@
                                     <control>
                                         <create name="add_product_control" string="Add a product"/>
                                     </control>
+
+                                    <!-- Hidden fields for forecast widget -->
+                                    <field name="product_type" invisible="1"/>
+                                    <field name="virtual_available_at_date" invisible="1"/>
+                                    <field name="qty_available_today" invisible="1"/>
+                                    <field name="free_qty_today" invisible="1"/>
+                                    <field name="scheduled_date" invisible="1"/>
+                                    <field name="forecast_expected_date" invisible="1"/>
+                                    <field name="warehouse_id" invisible="1"/>
+
                                     <field name="rental_state" invisible="1"/>
                                     <field name="sequence" widget="handle" />
-                                    <!-- We do not display the type because we don't want the user to be bothered with that information if he has no section or note. -->
                                     <field name="product_uom_category_id" invisible="1"/>
                                     <field name="item_type" invisible="1"/>
                                     <field name="item_code"/>
@@ -186,6 +181,10 @@
                                             'uom': product_uom,
                                             'company_id': parent.company_id
                                         }"/>
+                                    <field name="current_stock_qty" string="Available" readonly="1" optional="show"/>
+                                    <field name="virtual_stock_qty" string="Forecast" readonly="1" optional="show"/>
+                                    <field name="stock_status" string="Status" readonly="1" optional="show"/>
+                                    <field name="stock_info_display" string="Stock Info" readonly="1" optional="hide"/>
                                     <field
                                         name="product_uom"
                                         force_save="1"
@@ -217,16 +216,23 @@
                                     <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-danger" attrs="{'column_invisible': [('parent.state', '!=', 'active')]}"/>
                                 </tree>
                                 <form>
-                                    <!--
-                                        We need the sequence field to be here for new lines to be added at the correct position.
-                                        TODO: at some point we want to fix this in the framework so that an invisible field is not required.
-                                    -->
                                     <header>
                                         <field name="rental_state" widget="statusbar" statusbar_visible="draft,active,hireoff"/>
                                     </header>
                                     <field name="sequence" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
                                     <field name="product_uom_category_id" invisible="1"/>
+
+                                    <!-- Hidden fields for forecast widget -->
+                                    <field name="product_type" invisible="1"/>
+                                    <field name="virtual_available_at_date" invisible="1"/>
+                                    <field name="qty_available_today" invisible="1"/>
+                                    <field name="free_qty_today" invisible="1"/>
+                                    <field name="scheduled_date" invisible="1"/>
+                                    <field name="forecast_expected_date" invisible="1"/>
+                                    <field name="warehouse_id" invisible="1"/>
+                                    <field name="state" invisible="1"/>
+
                                     <group col="4">
 
                                         <group colspan="4" name="product_info" string="Product Information">
@@ -252,7 +258,6 @@
                                         </group> 
 
                                         <group name="product_period" colspan="2" string="Rental Duration">
-                                            <!-- <field name="date_definition_level" invisible="1"/> -->
                                             <label for="duration"/>
                                             <div class="o_row" name="duration_section">
                                                 <field name="duration"/>
@@ -302,6 +307,84 @@
 
                                         <group string="Total" colspan="2">
                                             <field name="price_subtotal"/>
+                                        </group>
+
+                                        <!-- Stock Information Section -->
+                                        <group colspan="4" string="Stock Information" attrs="{'invisible': [('product_id', '=', False)]}">
+                                            <!-- In Stock Alert -->
+                                            <div class="alert alert-success mb-3 border-start border-5 border-success" 
+                                                role="alert" 
+                                                style="background-color: #d1f2eb; border-radius: 2px; padding: 16px;"
+                                                attrs="{'invisible': [('stock_status', '!=', 'in_stock')]}">
+                                                <div class="row mt-3">
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Low Stock Alert -->
+                                            <div class="alert alert-warning mb-3 border-start border-5 border-warning" 
+                                                role="alert" 
+                                                style="background-color: #fff3cd; border-radius: 2px; padding: 16px;"
+                                                attrs="{'invisible': [('stock_status', '!=', 'low_stock')]}">
+                                                <div class="row mt-3">
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Out of Stock Alert -->
+                                            <div class="alert alert-danger mb-3 border-start border-5 border-danger" 
+                                                role="alert" 
+                                                style="background-color: #f8d7da; border-radius: 2px; padding: 16px;"
+                                                attrs="{'invisible': [('stock_status', '!=', 'out_of_stock')]}">
+                                                <div class="row mt-3">
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
+                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Hidden fields for computation -->
+                                            <field name="stock_status" invisible="1"/>
                                         </group>
                                     </group>
                                     <notebook>

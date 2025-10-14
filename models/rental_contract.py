@@ -71,6 +71,16 @@ class RentalContract(models.Model):
         ('done', 'Done'),
         ('cancel', 'Cancelled')
     ], string="Status", default='draft')
+
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        string='Warehouse',
+        required=True,
+        check_company=True,
+        default=lambda self: self.env['stock.warehouse'].search([
+            ('company_id', '=', self.env.company.id)
+        ], limit=1)
+    )
     
     @api.depends('start_date', 'duration', 'duration_unit')
     def _compute_end_date(self):

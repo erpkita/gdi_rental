@@ -21,6 +21,7 @@
     'maintainer': 'Rivan Rivaldi',
     'depends': [
         'base',
+        'web',
         'gdi_erp_dev_v15'
     ],
     'data': [
@@ -41,5 +42,6 @@
     'license': 'LGPL-3',
     'installable': True,
     'auto_install': False,
-    'application': True
+    'application': True,
+
 }

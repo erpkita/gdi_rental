@@ -92,6 +92,194 @@ class RentalQuotationLine(models.Model):
         )
     ]
 
+    # Fields for forecast widget
+    product_type = fields.Selection(related='product_id.type', string="Product Type")
+    virtual_available_at_date = fields.Float(
+        compute='_compute_qty_at_date',
+        digits='Product Unit of Measure',
+        string='Forecast Quantity',
+    )
+    qty_available_today = fields.Float(
+        compute='_compute_qty_at_date',
+        digits='Product Unit of Measure',
+        string='Available Today',
+    )
+    free_qty_today = fields.Float(
+        compute='_compute_qty_at_date',
+        digits='Product Unit of Measure',
+        string='Free Quantity Today',
+    )
+    scheduled_date = fields.Datetime(
+        string='Scheduled Date',
+        compute='_compute_scheduled_date',
+        store=True
+    )
+    forecast_expected_date = fields.Datetime(
+        compute='_compute_qty_at_date',
+        string='Expected Date'
+    )
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        string='Warehouse',
+        compute='_compute_warehouse_id',
+        store=True,
+        check_company=True
+    )
+
+    is_mto = fields.Boolean(
+        string="Is Made to Order",
+        compute="_compute_is_mto",
+        store=False
+    )
+
+    qty_to_delivery = fields.Float(
+        string="Quantity to Deliver",
+        compute="_compute_qty_to_deliver",
+        digits='Product Unit of Measure',
+        store=False
+    )
+
+
+    
+    # Enhanced stock visibility fields
+    current_stock_qty = fields.Float(
+        string='Current Stock',
+        compute='_compute_stock_quantities',
+        digits='Product Unit of Measure',
+        help='Current available quantity in warehouse'
+    )
+    
+    virtual_stock_qty = fields.Float(
+        string='Forecast Stock',
+        compute='_compute_stock_quantities', 
+        digits='Product Unit of Measure',
+        help='Forecasted quantity (current + incoming - outgoing)'
+    )
+    
+    stock_status = fields.Selection([
+        ('in_stock', 'In Stock'),
+        ('low_stock', 'Low Stock'),
+        ('out_of_stock', 'Out of Stock'),
+        ('no_product', 'No Product Selected')
+    ], string='Stock Status', compute='_compute_stock_quantities')
+    
+    stock_info_display = fields.Char(
+        string='Stock Info',
+        compute='_compute_stock_quantities',
+        help='Quick stock information display'
+    )
+    
+
+
+    @api.depends('product_id')
+    def _compute_is_mto(self):
+        """Check if product is Make to Order."""
+        for line in self:
+            if line.product_id and line.product_type == 'product':
+                # Check if product has MTO route
+                mto_route = self.env.ref('stock.route_warehouse0_mto', raise_if_not_found=False)
+                if mto_route:
+                    line.is_mto = mto_route in line.product_id.route_ids
+                else:
+                    line.is_mto = False
+            else:
+                line.is_mto = False
+
+    @api.depends('product_uom_qty', 'qty_available_today')
+    def _compute_qty_to_deliver(self):
+        """Compute quantity that needs to be delivered."""
+        for line in self:
+            line.qty_to_deliver = max(0, line.product_uom_qty - line.qty_available_today)
+
+    @api.depends('product_id', 'product_uom_qty', 'start_date', 'warehouse_id', 'product_type')
+    def _compute_qty_at_date(self):
+        """Compute forecast quantities for the product at the scheduled date."""
+        for line in self:
+            if not line.product_id or line.product_type != 'product':
+                line.virtual_available_at_date = 0.0
+                line.qty_available_today = 0.0
+                line.free_qty_today = 0.0
+                line.forecast_expected_date = False
+                continue
+
+            try:
+                # Get warehouse context
+                warehouse = line.warehouse_id.id if line.warehouse_id else False
+                
+                # Get current quantities
+                product_ctx = line.product_id.with_context(warehouse=warehouse)
+                line.qty_available_today = product_ctx.qty_available or 0.0
+                line.free_qty_today = product_ctx.free_qty or 0.0
+
+                # Get forecast at scheduled date
+                if line.scheduled_date:
+                    product_forecast = line.product_id.with_context(
+                        warehouse=warehouse,
+                        to_date=line.scheduled_date
+                    )
+                    line.virtual_available_at_date = product_forecast.virtual_available or 0.0
+                    
+                    # Calculate expected date if quantity is insufficient
+                    if line.virtual_available_at_date < line.product_uom_qty:
+                        line.forecast_expected_date = line._get_forecast_expected_date()
+                    else:
+                        line.forecast_expected_date = False
+                else:
+                    line.virtual_available_at_date = line.free_qty_today
+                    line.forecast_expected_date = False
+                    
+            except Exception as e:
+                # Fallback to safe defaults if there's any error
+                line.virtual_available_at_date = 0.0
+                line.qty_available_today = 0.0
+                line.free_qty_today = 0.0
+                line.forecast_expected_date = False
+
+    @api.depends('start_date')
+    def _compute_scheduled_date(self):
+        """Compute scheduled date based on start date."""
+        for line in self:
+            if line.start_date:
+                # Convert date to datetime (start of day in UTC)
+                line.scheduled_date = fields.Datetime.to_datetime(line.start_date)
+            else:
+                line.scheduled_date = False
+
+    @api.depends('quotation_id.warehouse_id', 'company_id')
+    def _compute_warehouse_id(self):
+        """Get warehouse from quotation or company default."""
+        for line in self:
+            if hasattr(line.quotation_id, 'warehouse_id') and line.quotation_id.warehouse_id:
+                line.warehouse_id = line.quotation_id.warehouse_id
+            elif line.company_id:
+                warehouse = self.env['stock.warehouse'].search([
+                    ('company_id', '=', line.company_id.id)
+                ], limit=1)
+                line.warehouse_id = warehouse
+            else:
+                line.warehouse_id = False
+
+
+    
+
+    
+
+    def _get_forecast_expected_date(self):
+        """Calculate the expected date when stock will be available."""
+        self.ensure_one()
+        if not self.product_id:
+            return False
+            
+        # Look for incoming stock moves
+        moves = self.env['stock.move'].search([
+            ('product_id', '=', self.product_id.id),
+            ('state', 'not in', ['done', 'cancel']),
+            ('date', '>', fields.Datetime.now()),
+            ('location_dest_id.usage', '=', 'internal')
+        ], order='date', limit=1)
+        
+        return moves.date if moves else False
+
     @api.model
     def default_get(self, fields_list):
         res = super(RentalQuotationLine, self).default_get(fields_list)
@@ -216,3 +404,68 @@ class RentalQuotationLine(models.Model):
             rec.update({
                 'price_unit': total_price_unit
             })
+    
+    # Enhanced Stock Visibility Methods
+    @api.depends('product_id', 'warehouse_id')
+    def _compute_stock_quantities(self):
+        """Compute current and forecast stock quantities with status"""
+        for line in self:
+            if not line.product_id:
+                line.current_stock_qty = 0.0
+                line.virtual_stock_qty = 0.0
+                line.stock_status = 'no_product'
+                line.stock_info_display = 'No Product Selected'
+                continue
+                
+            # Get warehouse context
+            warehouse_id = line.warehouse_id.id if line.warehouse_id else line.env.user.company_id.warehouse_id.id
+            
+            # Get stock quantities with warehouse context
+            product_with_context = line.product_id.with_context(warehouse=warehouse_id)
+            
+            line.current_stock_qty = product_with_context.qty_available
+            line.virtual_stock_qty = product_with_context.virtual_available
+            
+            # Determine stock status
+            if line.current_stock_qty > 0:
+                if line.current_stock_qty >= line.product_uom_qty:
+                    line.stock_status = 'in_stock'
+                else:
+                    line.stock_status = 'low_stock'
+            else:
+                line.stock_status = 'out_of_stock'
+            
+            # Create display string
+            line.stock_info_display = f"Available: {line.current_stock_qty:.0f} | Forecast: {line.virtual_stock_qty:.0f}"
+    
+    @api.onchange('product_id')
+    def _onchange_product_stock_info(self):
+        """Trigger stock computation when product is selected - no popup warnings"""
+        # Just trigger recomputation of stock fields - the widget will show the inline info
+        pass
+    
+    def action_view_stock_forecast(self):
+        """Open the stock forecast (replenishment) page for the selected product"""
+        self.ensure_one()
+        if not self.product_id:
+            return False
+
+        # Get warehouse
+        warehouse_id = self.warehouse_id.id if self.warehouse_id else self.env.user.company_id.warehouse_id.id
+
+        # Get the existing stock replenishment action
+        action = self.env.ref('stock.stock_replenishment_product_product_action').read()[0]
+
+        # Customize the domain and context
+        action.update({
+            'name': f'Stock Forecast - {self.product_id.display_name}',
+            'domain': [('product_id', '=', self.product_id.id)],
+            'context': {
+                'search_default_product_id': self.product_id.id,
+                'default_product_id': self.product_id.id,
+                'default_warehouse_id': warehouse_id,
+                'search_default_warehouse_id': warehouse_id,
+            },
+        })
+
+        return action
