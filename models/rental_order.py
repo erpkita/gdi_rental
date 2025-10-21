@@ -339,6 +339,7 @@ class GdiRentalOrder(models.Model):
 
     def _prepare_contract_line(self, line):
         contract_line_vals = {
+            'ro_line_id': line.id,
             'name': line.name,
             'item_type': line.item_type,
             'item_code': line.item_code,
@@ -420,7 +421,7 @@ class GdiRentalOrder(models.Model):
                 raise ValidationError(_("Error while creating contract. Please contact administrator !"))
             
             # auto sign the contract because its first rental and we expect to auto generate DO.
-            contract_id.create_do()
+            contract_id.with_context({'new_rdo': True}).create_do()
 
             rec.write({
                 'state': 'ongoing', 

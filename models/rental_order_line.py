@@ -157,6 +157,7 @@ class GDIRentalOrderLine(models.Model):
         compute='_compute_stock_quantities',
         help='Quick stock information display'
     )
+    stock_move_ids = fields.One2many("stock.move", "ro_line_id", string="Stock Moves")
 
     @api.depends('duration', 'duration_unit')
     def _compute_duration_str(self):

@@ -173,145 +173,6 @@ class RentalContract(models.Model):
 
         self.update(values)
 
-    # def create_do(self):
-    #     for rec in self:
-    #         picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Rental Delivery Orders')], limit=1)
-    #         if not picking_type_id:
-    #             picking_type_id = self.env['stock.picking.type'].search([('name', '=', 'Delivery Orders')], limit=1)
-    #         warehouse_id = picking_type_id.warehouse_id
-    #         stock_picking_vals = {
-    #             'partner_id': rec.partner_id.id or False,
-    #             'contact_person_id': rec.partner_id.id or False,
-    #             'is_rental_do': True,
-    #             'gdi_rental_id': rec.order_id.id or False,
-    #             'rental_contract_id': rec.id or False,
-    #             'picking_type_id': picking_type_id.id or False,
-    #             'origin': rec.name,
-    #             'customer_po': rec.customer_po_number,
-    #             'move_type': 'direct',
-    #             'location_id': picking_type_id.default_location_src_id.id or False,
-    #             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-    #             'src_user_id': rec.user_id.id or False,
-    #             'scheduled_date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #             'date_deadline': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #             'date_done': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #         }
-
-    #         rental_item_ids = []
-    #         for item in rec.contract_line_ids:
-    #             rental_item_ids.append((
-    #                 0, 0, {
-    #                     'name': item.name or '',
-    #                     'item_code': item.item_code or '',
-    #                     'sequence': item.sequence or '',
-    #                     'contract_line_id': item.id,
-    #                     'product_id': item.product_id.id or False,
-    #                     'product_template_id': item.product_template_id.id or False,
-    #                     'product_uom_qty': item.product_uom_qty or 1.0,
-    #                     'product_uom': item.product_uom.id or False,
-    #                     'product_uom_category_id': item.product_uom_category_id.id or False,
-    #                     'product_uom_txt': item.product_uom_txt or 'SET',
-    #                     'price_unit': item.price_unit or 0.0,
-    #                     'start_date': item.start_date or False,
-    #                     'end_date': item.end_date or False,
-    #                     'duration': item.duration or False,
-    #                     'duration_unit': item.duration_unit or False,
-    #                 }
-    #             ))
-    #         stock_picking_vals.update({
-    #             'rental_order_item_ids': rental_item_ids
-    #         })
-    #         try :
-    #             picking_id = self.env["stock.picking"].create(stock_picking_vals)
-
-    #             for rental_item in picking_id.rental_order_item_ids:
-    #                 item = rental_item.contract_line_id
-    #                 item_type = item.item_type
-
-    #                 if item_type != 'set':
-    #                     self.env["stock.move"].create({
-    #                         'sequence_number': item.sequence,
-    #                         'name': item.name,
-    #                         'description_picking': item.name,
-    #                         'product_id': item.product_id.id or False,
-    #                         'product_uom': item.product_uom.id or False,
-    #                         'location_id': picking_type_id.default_location_src_id.id or False,
-    #                         'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-    #                         'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #                         'price_unit': item.price_unit,
-    #                         'product_uom_qty': item.product_uom_qty,
-    #                         'picking_id': picking_id.id,
-    #                         'rental_order_item_id': rental_item.id
-    #                     })
-    #                 else:
-    #                     for comp in item.component_line_ids:
-    #                         self.env["stock.move"].create({
-    #                             'sequence_number': item.sequence,
-    #                             'name': comp.product_id.product_name,
-    #                             'description_picking': comp.product_id.product_name,
-    #                             'product_id': comp.product_id.id or False,
-    #                             'product_uom': comp.product_uom.id or False,
-    #                             'location_id':picking_type_id.default_location_src_id.id or False,
-    #                             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-    #                             'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #                             'price_unit': comp.price_unit,
-    #                             'product_uom_qty': comp.product_uom_qty,
-    #                             'rental_order_item_id': rental_item.id,
-    #                             'picking_id': picking_id.id
-    #                         })
-                    
-    #                 item.ro_line_id.update({
-    #                     'rental_state': 'active'
-    #                 })
-
-    #         except Exception:
-    #             raise ValidationError("Error")
-
-    #         rec.write({
-    #             'state': 'signed'
-    #         })
-
-            # move_line_ids = []
-
-            # for item in rec.contract_line_ids:
-
-            #     if item.item_type != 'set':
-            #         move_line_ids.append((0,0, {
-            #             'sequence_number': item.sequence,
-            #             'name': item.name,
-            #             'description_picking': item.name,
-            #             'product_id': item.product_id.id or False,
-            #             'product_uom': item.product_uom.id or False,
-            #             'location_id':picking_type_id.default_location_src_id.id or False,
-            #             'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-            #             'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            #             'price_unit': item.price_unit,
-            #             'product_uom_qty': item.product_uom_qty
-            #         }))
-            #     else:
-            #         for comp in item.component_line_ids:
-            #             move_line_ids.append((0,0, {
-            #                 'sequence_number': item.sequence,
-            #                 'name': comp.product_id.product_name,
-            #                 'description_picking': comp.product_id.product_name,
-            #                 'product_id': comp.product_id.id or False,
-            #                 'product_uom': comp.product_uom.id or False,
-            #                 'location_id':picking_type_id.default_location_src_id.id or False,
-            #                 'location_dest_id': rec.partner_id.property_stock_customer.id or False,
-            #                 'date': fields.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            #                 'price_unit': comp.price_unit,
-            #                 'product_uom_qty': comp.product_uom_qty
-            #             }))
-
-            #     item.ro_line_id.update({
-            #         'rental_state': 'active'
-            #     })
-
-            # stock_picking_vals.update({
-            #     'move_ids_without_package': move_line_ids,
-            #     'rental_order_item_ids': rental_item_ids})
-            
-            # picking_id = self.env['stock.picking'].create(stock_picking_vals)
 
     def create_do(self):
         """
@@ -327,13 +188,24 @@ class RentalContract(models.Model):
         if not self:
             return self.env['stock.picking']
         
+        picking_type_id = self.env["stock.picking.type"].search([(
+            'name', '=', 'Rental Physical Inventory'
+        )])
+        if not picking_type_id:
+            raise ValidationError("Operation type not found. Please contact your system administrator !")
+
         created_pickings = self.env['stock.picking']
         
         for contract in self:
             # try:
+            if not self._context.get('new_rdo'):
+                self._create_physical_inventory(picking_type_id)
+
             picking = self._create_single_delivery_order(contract)
             if picking:
                 created_pickings |= picking
+                
+                picking.action_confirm()
                 # Update contract state only after successful creation
                 contract.write({'state': 'signed'})
             # except Exception as e:
@@ -526,6 +398,7 @@ class RentalContract(models.Model):
             'product_uom_qty': qty,
             'picking_id': picking.id,
             'rental_order_item_id': rental_item.id,
+            'ro_line_id': contract_line.ro_line_id.id
         }
         
         return self.env["stock.move"].create(move_vals)
@@ -548,3 +421,344 @@ class RentalContract(models.Model):
                 contract_line, contract, picking, picking_type,
                 rental_item, current_datetime, component=component
             )
+
+    def _create_physical_inventory(self, picking_type_id):
+        """
+        Create physical inventory transfer for rental extension items.
+
+        Args:
+            picking_type_id: stock.picking.type record for the return operation
+
+        Returns:
+            stock.picking: Created picking record
+
+        Raises:
+            UserError: when picking creation or validation fails.
+        """
+
+        if not self or not self.contract_line_ids:
+            return self.env["stock.picking"]
+
+        try:
+            # Build all move lines first
+            move_lines = self._create_return_stock_moves(picking_type_id)
+            
+            # Create picking with all moves at once
+            picking_vals = self._prepare_return_picking_vals(picking_type_id, move_lines)
+            picking = self.env["stock.picking"].create(picking_vals)
+
+            # Validate the picking
+            picking.button_validate()
+
+            return picking
+        except Exception as e:
+            _logger.error(f"Failed to create physical inventory for rental extension: {str(e)}")
+            raise UserError(
+                _("Failed to create physical inventory. Error: %s" % str(e))
+            )
+    
+    def _prepare_return_picking_vals(self, picking_type_id, move_lines):
+        """
+        Prepare values for creating return stock picking record.
+
+        Args: 
+            picking_type_id: stock.picking.type record
+            move_lines: list of move tuples to include
+
+        Returns:
+            dict: Values for stock.picking creation
+        """
+        current_datetime = fields.Datetime.now()
+
+        picking_vals = {
+            'partner_id': self.partner_id.id,
+            'contact_person_id': self.order_id.partner_id.id,
+            'picking_type_id': picking_type_id.id,
+            'location_id': picking_type_id.default_location_dest_id.id,
+            'location_dest_id': picking_type_id.default_location_src_id.id,
+            'move_type': 'direct',
+            'scheduled_date': current_datetime,
+            'date_deadline': current_datetime,
+            'origin': f"{self.order_id.name} Extend (IN)",
+            'customer_po': self.customer_po_number,
+            'src_user_id': self.env.user.id,
+            'move_ids_without_package': move_lines,  # Add moves here
+            'rental_id': False,
+        }
+
+        return picking_vals
+    
+    def _create_return_stock_moves(self, picking_type_id):
+        """
+        Create stock move data for rental extension return items.
+        Handles both regular items and set items with components.
+        Returns list of tuples for move creation.
+
+        Args:
+            picking_type_id: stock.picking.type record
+            
+        Returns:
+            list: List of tuples for creating stock moves
+        """
+        current_datetime = fields.Datetime.now()
+        move_lines = []
+        sq_no = 0
+        
+        for line in self.contract_line_ids:
+            sq_no += 1 
+
+            prev_picking = self._get_previous_picking(line)
+            if not prev_picking:
+                _logger.warning(f"No previous picking found for rental extend line: {line.name}")
+                continue
+
+            if line.item_type == 'set' and line.component_line_ids:
+                # Handle set items with components
+                component_moves = self._prepare_return_set_component_moves(
+                    line, picking_type_id, prev_picking,
+                    sq_no, current_datetime
+                )
+                move_lines.extend(component_moves)
+            else:
+                # Handle regular unit items
+                move_data = self._prepare_return_stock_move(
+                    line, picking_type_id, prev_picking, 
+                    sq_no, current_datetime
+                )
+                if move_data:
+                    move_lines.append(move_data)
+        
+        return move_lines
+    
+    def _get_previous_picking(self, line):
+        """
+        Get the previous picking/move for a rental line.
+        
+        Args:
+            line: rental extension line record
+            
+        Returns:
+            stock.move: Previous stock move or False
+        """
+        if not line.ro_line_id or not line.ro_line_id.stock_move_ids:
+            return False
+        
+        moves = line.ro_line_id.stock_move_ids
+        return moves[-1] if moves else False
+    
+    def _prepare_return_set_component_moves(self, line, picking_type_id,
+                                           prev_picking, sequence, current_datetime):
+        """
+        Prepare return move data for all components in a set.
+        
+        Args:
+            line: rental extension line record (set item)
+            picking_type_id: stock.picking.type record
+            prev_picking: previous stock.move record
+            sequence: base sequence number for the set
+            current_datetime: current datetime
+            
+        Returns:
+            list: List of tuples for creating component moves
+        """
+        component_moves = []
+        component_seq = 0
+        
+        for component in line.component_line_ids:
+            component_seq += 1
+
+            prev_component_move = self._find_component_previous_move(
+                component, prev_picking
+            )
+
+            if not prev_component_move:
+                _logger.warning(
+                    f"No previous move found for component {component.product_id.name} "
+                    f"in set {line.name}"
+                )
+                continue
+
+            move_data = self._prepare_return_component_move(
+                line, component, picking_type_id,
+                prev_component_move, sequence, component_seq, current_datetime
+            )
+            
+            if move_data:
+                component_moves.append(move_data)
+        
+        return component_moves
+
+    def _find_component_previous_move(self, component, prev_picking):
+        """
+        Find the previous stock move for a specific component.
+        
+        Args:
+            component: component line record
+            prev_picking: previous stock.move or stock.picking record
+            
+        Returns:
+            stock.move: Previous move for this component or False
+        """
+        # If prev_picking is a stock.move, get its picking
+        if prev_picking._name == 'stock.move':
+            picking = prev_picking.picking_id
+        else:
+            picking = prev_picking
+        
+        if not picking:
+            return False
+        
+        # Search for move with matching product
+        component_move = picking.move_lines.filtered(
+            lambda m: m.product_id.id == component.product_id.id
+        )
+        
+        return component_move[0] if component_move else False
+
+    def _prepare_return_component_move(self, set_line, component, 
+                                    picking_type_id, prev_component_move,
+                                    set_sequence, component_sequence, current_datetime):
+        """
+        Prepare return stock move data for a single set component.
+        
+        Args:
+            set_line: rental extension line record (parent set)
+            component: component line record
+            picking_type_id: stock.picking.type record
+            prev_component_move: previous stock.move for this component
+            set_sequence: sequence number of the parent set
+            component_sequence: sequence number within components
+            current_datetime: current datetime
+            
+        Returns:
+            tuple: Move data tuple (0, 0, dict) for creation
+        """
+        # Prepare move lines with lot tracking for the component
+        move_line_vals = self._prepare_component_return_move_lines(
+            component, prev_component_move, picking_type_id, current_datetime
+        )
+        
+        # Use component details for the move
+        product = component.product_id
+        name = product.product_name or product.name or component.name
+        
+        # Prepare main move values
+        move_vals = {
+            'sequence_number': set_sequence + (component_sequence * 0.01),  # e.g., 1.01, 1.02
+            'name': f"{set_line.name} - {name}",
+            'description_picking': name,
+            'product_id': product.id,
+            'product_uom': component.product_uom.id,
+            'product_uom_qty': component.product_uom_qty,
+            'date': current_datetime,
+            'location_id': picking_type_id.default_location_dest_id.id,
+            'location_dest_id': prev_component_move.location_id.id,
+            'move_line_ids': move_line_vals,
+        }
+        
+        return (0, 0, move_vals)
+
+    def _prepare_component_return_move_lines(self, component, prev_component_move,
+                                            picking_type_id, current_datetime):
+        """
+        Prepare detailed move lines for component returns with lot/serial tracking.
+        
+        Args:
+            component: component line record
+            prev_component_move: previous stock.move record for this component
+            picking_type_id: stock.picking.type record
+            current_datetime: current datetime
+            
+        Returns:
+            list: List of tuples for creating stock.move.line records
+        """
+        move_lines = []
+        
+        if not prev_component_move.move_line_ids:
+            return move_lines
+        
+        for moveline in prev_component_move.move_line_ids:
+            move_line_vals = {
+                'product_id': component.product_id.id,
+                'product_uom_id': component.product_uom.id,
+                'product_uom_qty': moveline.qty_done,
+                'qty_done': moveline.qty_done,
+                'date': current_datetime,
+                'location_id': picking_type_id.default_location_dest_id.id,
+                'location_dest_id': prev_component_move.location_id.id,
+                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
+            }
+            move_lines.append((0, 0, move_line_vals))
+        
+        return move_lines
+
+    def _prepare_return_stock_move(self, line, picking_type_id, 
+                                prev_picking, sequence, current_datetime):
+        """
+        Prepare return stock move data with detailed move lines.
+        (For non-set items)
+        
+        Args:
+            line: rental extension line record
+            picking_type_id: stock.picking.type record
+            prev_picking: previous stock.move record
+            sequence: sequence number for the move
+            current_datetime: current datetime
+            
+        Returns:
+            tuple: Move data tuple (0, 0, dict) for creation
+        """
+        # Prepare move lines with lot tracking
+        move_line_vals = self._prepare_return_move_lines(
+            line, prev_picking, picking_type_id, current_datetime
+        )
+        
+        # Prepare main move values
+        move_vals = {
+            'sequence_number': sequence,
+            'name': line.name,
+            'description_picking': line.name,
+            'product_id': line.product_id.id,
+            'product_uom': line.product_uom.id,
+            'product_uom_qty': line.product_uom_qty,
+            'date': current_datetime,
+            'location_id': picking_type_id.default_location_dest_id.id,
+            'location_dest_id': prev_picking.location_id.id,
+            'move_line_ids': move_line_vals,
+        }
+        
+        return (0, 0, move_vals)
+
+    def _prepare_return_move_lines(self, line, prev_picking, picking_type_id, current_datetime):
+        """
+        Prepare detailed move lines with lot/serial tracking from previous picking.
+        (For non-set items)
+        
+        Args:
+            line: rental extension line record
+            prev_picking: previous stock.move record
+            picking_type_id: stock.picking.type record
+            current_datetime: current datetime
+            
+        Returns:
+            list: List of tuples for creating stock.move.line records
+        """
+        move_lines = []
+        
+        if not prev_picking.move_line_ids:
+            return move_lines
+        
+        for moveline in prev_picking.move_line_ids:
+            move_line_vals = {
+                'product_id': line.product_id.id,
+                'product_uom_id': line.product_uom.id,
+                'product_uom_qty': moveline.qty_done,
+                'qty_done': moveline.qty_done,
+                'date': current_datetime,
+                'location_id': picking_type_id.default_location_dest_id.id,
+                'location_dest_id': prev_picking.location_id.id,
+                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
+            }
+            move_lines.append((0, 0, move_line_vals))
+        
+        return move_lines

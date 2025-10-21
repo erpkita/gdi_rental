@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="gdi_rental_delivery_order_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <t t-set="o" t-value="o.with_context(lang=o.partner_id.lang)" />
+                <t t-set="partner" t-value="o.partner_id or False"/>
+                <div class="page" style="font-family:'Times Newer Roman';">
+                    <div class="oe_structure"/>
+                    <div class="pt-3"/>
+                    <div class="row" style="font-size:15px; font-weight:bold;">
+                        <div class="col-7">
+                            <table width="100%">
+                                <t t-if="o.gdi_rental_id">
+                                    <t t-set="partner_rental" t-value="o.gdi_rental_id.partner_id"/>
+                                    <tr>
+                                        <td style="width:20%;">CUSTOMER</td>
+                                        <td style="width:2%;">:&#160;&#160;</td>
+                                        <td><span t-esc="partner_rental.partner_ref_no"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner_rental.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner_rental.street"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner_rental.street2"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner_rental.city"/>&#160;<span t-esc="partner_rental.zip"/></td>
+                                    </tr>
+                                </t>
+                                <t t-else="">
+                                    <tr>
+                                        <td style="width:20%;">CUSTOMER</td>
+                                        <td style="width:2%;">:&#160;&#160;</td>
+                                        <td>
+                                            <t t-if="partner.is_company">
+                                                <span t-esc="partner.partner_ref_no"/>
+                                            </t>
+                                            <t t-elif="partner.parent_id">
+                                                <span t-esc="partner.parent_id.partner_ref_no"/>
+                                            </t>
+                                            <t t-else="">
+                                                <span t-esc="partner.name"/>
+                                            </t>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner.street"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner.street2"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3"><span t-esc="partner.city"/>&#160;<span t-esc="partner.zip"/></td>
+                                    </tr>
+                                </t>
+                            </table>
+                            <br/>
+                            <table width="100%">
+                                <tr>
+                                    <td style="width:20%;">DELIVER TO &#160;:</td>
+                                    <td style="width:2%;" class="text-left"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><span t-esc="partner.display_name"/></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><span t-esc="partner.street"/></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><span t-esc="partner.street2"/></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><span t-esc="partner.city"/>&#160;<span t-esc="partner.zip"/></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-5">
+                            <table width="100%">
+                                <tr>
+                                    <td style="width:39%;">DATE</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td>
+                                        <t t-if="o.state == 'done'">
+                                            <span t-esc="o.date_done.strftime('%d %b %Y')"/>
+                                        </t>
+                                        <t t-else="">
+                                            <span t-esc="o.scheduled_date.strftime('%d %b %Y')"/>
+                                        </t>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="width:39%;">RDO NO.</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.name"/></td>
+                                </tr>
+                                <tr t-if="o.gdi_rental_id">
+                                    <td style="width:39%;">RENTAL ORDER</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.gdi_rental_id.name"/></td>
+                                </tr>
+                                <tr t-if="o.rental_contract_id">
+                                    <td style="width:39%;">CONTRACT</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.rental_contract_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="width:39%;">CURRENCY</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.currency_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="width:39%;">SALES NAME</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.user_id.name"/></td>
+                                </tr>
+                            </table>
+                            <br/>
+                            <table width="100%">
+                                <tr>
+                                    <td style="width:32%;">Contact Person</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-field="o.contact_person"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="width:32%;">Mobile</td>
+                                    <td style="width:2%;">:&#160;&#160;</td>
+                                    <td><span t-esc="partner.mobile"/></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="pt-3"/>
+                    <!-- Rental Items Table -->
+                    <table class="table-sm">
+                        <thead style="font-size:15px; border-bottom: 2px solid black;">
+                            <tr>
+                                <th name="th_sm_no_seq" style="border-bottom: 2px solid black; width:5%;"><strong>NO.</strong></th>
+                                <th name="th_sm_item_code" style="border-bottom: 2px solid black; width:15%;"><strong>ITEM CODE</strong></th>
+                                <th name="th_sm_description" style="border-bottom: 2px solid black; width:35%;"><strong>DESCRIPTION</strong></th>
+                                <th name="th_sm_quantity" style="border-bottom: 2px solid black; width:8%;"><strong>QTY</strong></th>
+                                <th name="th_sm_uom" style="border-bottom: 2px solid black; width:8%;"><strong>UOM</strong></th>
+                                <th name="th_rental_start_date" style="border-bottom: 2px solid black; width:12%;"><strong>START DATE</strong></th>
+                                <th name="th_rental_end_date" style="border-bottom: 2px solid black; width:12%;"><strong>END DATE</strong></th>
+                                <th name="th_rental_duration" style="border-bottom: 2px solid black; width:5%;"><strong>DURATION</strong></th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size:14px;">
+                            <t t-set="lines" t-value="o.rental_order_item_ids"/>
+                            <t t-set="no_seq" t-value="0"/>
+                            <tr t-foreach="lines" t-as="item">
+                                <t t-set="no_seq" t-value="no_seq + 1"/>
+                                <td style="padding-bottom:4px;"><span t-esc="no_seq"/>.</td>
+                                <td style="padding-bottom:4px;">
+                                    <span t-field="item.item_code"/>
+                                    <t t-if="item.product_id and item.product_id.mysql_code">
+                                        <br/>[<span t-field="item.product_id.mysql_code"/>]
+                                    </t>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <span t-field="item.name"/>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <span t-esc="'%.2f' % item.product_uom_qty"/>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <t t-if="item.product_uom">
+                                        <span t-field="item.product_uom.name"/>
+                                    </t>
+                                    <t t-else="">
+                                        <span t-field="item.product_uom_txt"/>
+                                    </t>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <t t-if="item.start_date">
+                                        <span t-esc="item.start_date.strftime('%d %b %Y')"/>
+                                    </t>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <t t-if="item.end_date">
+                                        <span t-esc="item.end_date.strftime('%d %b %Y')"/>
+                                    </t>
+                                </td>
+                                <td style="padding-bottom:4px;">
+                                    <span t-esc="item.duration"/>
+                                    <t t-if="item.duration_unit == 'hour'">Hr</t>
+                                    <t t-elif="item.duration_unit == 'day'">D</t>
+                                    <t t-elif="item.duration_unit == 'week'">W</t>
+                                    <t t-elif="item.duration_unit == 'month'">M</t>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="page-break-inside: avoid;page-break-before: auto;page-break-after:avoid;">
+                        <div class="row">
+                            <div class="col-12">
+                                <div style="border-bottom: 2px solid black;"/>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12" style="font-size:15px;">
+                                <p>
+                                Thanks for your rental order! Please check equipment condition before receiving. Rental equipment must be returned in the same condition.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="page-break-inside: avoid;page-break-before: auto;page-break-after:avoid;">
+                        <div class="row">
+                            <div class="pt-3"/>
+                        </div>
+                        <div class="row">
+                            <div class="pt-3"/>
+                        </div>
+
+                        <div class="row signature" style="font-size:15px;">
+                            <div class="col-4">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="text-align:center;"><strong>Issued by,</strong></td>
+                                    </tr>
+                                    <tr style="height:80px;">
+                                        <td style="text-align:center;"/>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            (&#160;&#160;&#160;&#160;&#160;&#160;<span t-esc="user.name"/>&#160;&#160;&#160;&#160;&#160;&#160;)
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-2">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="text-align:center;"><strong>Approved by,</strong></td>
+                                    </tr>
+                                    <tr style="height:80px;">
+                                        <td style="text-align:center;"/>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            (&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;)
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-3">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="text-align:center;"><strong>Delivered by,</strong></td>
+                                    </tr>
+                                    <tr style="height:80px;">
+                                        <td style="text-align:center;"/>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            (&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;)
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-3">
+                                <table width="100%">
+                                    <tr>
+                                        <td style="text-align:center;"><strong>Received by,</strong></td>
+                                    </tr>
+                                    <tr style="height:80px;">
+                                        <td style="text-align:center;"/>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            (&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;)
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <br/><br/><br/>
+                        <div class="col-12" style="font-size:14px;">
+                            Print Count : <span t-esc="printcount"/> <br/>
+                            By <span t-esc="user.name"/> at <span  t-esc="context_timestamp(datetime.datetime.now()).strftime('%d/%b/%Y %H:%M:%S')"/>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_rental_delivery_order">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="gdi_rental.gdi_rental_delivery_order_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+</odoo>

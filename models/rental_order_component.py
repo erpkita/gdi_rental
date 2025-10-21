@@ -291,6 +291,8 @@ class RentalOrderComponent(models.Model):
         help='Quick stock information display'
     )
 
+    stock_move_ids = fields.One2many("stock.move", "rental_order_component_id", string="Stock Moves")
+
     @api.depends('order_line_id.warehouse_id', 'order_line_id.company_id')
     def _compute_warehouse_id(self):
         """Get warehouse from order line."""

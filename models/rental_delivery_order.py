@@ -10,6 +10,10 @@ class StockPicking(models.Model):
     gdi_rental_id = fields.Many2one("gdi.rental.order", string="Rental")
     rental_contract_id = fields.Many2one("rental.contract", string="Contract")
     is_rental_do = fields.Boolean(string="RDO ?", default=False)
+    show_rdo_lot = fields.Boolean(
+        string="Display Lot Details",
+        help="Show Lot details in the RDO PDF report."
+    )
 
     @api.onchange('is_rental_do')
     def onchange_rental_do(self):
@@ -22,11 +26,16 @@ class StockPicking(models.Model):
 
     def action_print_rental_picking_list(self):
         return self.env.ref("gdi_rental.gdi_action_report_rental_picking_list").report_action(self) 
+    
+    def action_print_rdo_pdf(self):
+        return self.env.ref("gdi_rental.gdi_action_report_rdo").report_action(self)
 
 class StockMove(models.Model):
     _inherit = "stock.move"
     
     rental_order_item_id = fields.Many2one("stock.rental.order.item", string="Rental Order Item")
+    ro_line_id = fields.Many2one("gdi.rental.order.line", string="Rental Order Line")
+    rental_order_component_id = fields.Many2one("rental.order.component", string="Rental Order Component")
 
 class StockRentalOrderItem(models.Model):
     _name = "stock.rental.order.item"
