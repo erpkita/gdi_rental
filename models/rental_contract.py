@@ -67,7 +67,7 @@ class RentalContract(models.Model):
     
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('signed', 'Active'),
+        ('signed', 'Signed'),
         ('done', 'Done'),
         ('cancel', 'Cancelled')
     ], string="Status", default='draft')

@@ -131,6 +131,8 @@ class GdiRentalOrder(models.Model):
 
     effective_end_date = fields.Date(string="Effective End Date")
     contract_id = fields.Many2one("rental.contract", string="Active Contract")
+    rental_contract_ids = fields.One2many("rental.contract", "order_id", string="Contracts Documents")
+    rental_picking_ids = fields.One2many("stock.picking", "gdi_rental_id", string="RDO Documents")
 
     warehouse_id = fields.Many2one(
         'stock.warehouse',
@@ -430,6 +432,19 @@ class GdiRentalOrder(models.Model):
             })
 
     def action_hireoff(self):
+        for rec in self:
+            picking_type_id = self.env["stock.picking.type"].search([('name', '=', 'Rental Physical Inventory')], limit=1)
+            if not picking_type_id:
+                raise ValidationError(_("Operation type to perform hire-off not found. Please contact your system administrator !"))
+            
+            # physical_inventory_hireoff = rec._create_physical_inventory_hireoff(picking_type_id)
+
+            rec.write({
+                'state': 'hireoff'
+            })
+            pass
+
+    def _create_physical_inventory_hireoff(self, picking_type_id):
         pass
 
 

@@ -436,9 +436,76 @@
                                                                 <field name="available_qty"/>
                                                                 <field name="lot_id"/> -->
                                                             </group>
-
-                                                            <group string="Stock Info" colspan="2">
-                                                                <field name="available_qty"/>
+                                                            <!-- Stock Information Section -->
+                                                            <group colspan="4" string="Stock Information" attrs="{'invisible': [('product_id', '=', False)]}">
+                                                                <!-- In Stock Alert -->
+                                                                <div class="alert alert-success mb-3 border-start border-5 border-success" role="alert" style="background-color: #d1f2eb; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'in_stock')]}">
+                                                                    <!-- <div class="d-flex align-items-center mb-2">
+                                                                        <span style="font-size: 12px; margin-right: 10px;">✅</span>
+                                                                        <strong style="font-size: 12px; color: #0f5132;">In Stock</strong>
+                                                                    </div> -->
+                                                                    <div class="row mt-3">
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <!-- Low Stock Alert -->
+                                                                <div class="alert alert-warning mb-3 border-start border-5 border-warning" role="alert" style="background-color: #fff3cd; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'low_stock')]}">
+                                                                    <!-- <div class="d-flex align-items-center mb-2">
+                                                                        <span style="font-size: 12px; margin-right: 10px;">⚠️</span>
+                                                                        <strong style="font-size: 12px; color: #664d03;">Low Stock - Reorder Recommended</strong>
+                                                                    </div> -->
+                                                                    <div class="row mt-3">
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <!-- Out of Stock Alert -->
+                                                                <div class="alert alert-danger mb-3 border-start border-5 border-danger" role="alert" style="background-color: #f8d7da; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'out_of_stock')]}">
+                                                                    <!-- <div class="d-flex align-items-center mb-2">
+                                                                        <span style="font-size: 12px; margin-right: 10px;">❌</span>
+                                                                        <strong style="font-size: 12px; color: #842029;">Out of Stock - Urgent Action Required</strong>
+                                                                    </div> -->
+                                                                    <div class="row mt-3">
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
+                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
+                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                                        </div>
+                                                                        <div class="col-4">
+                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
+                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <!-- Hidden fields for computation -->
+                                                                <field name="stock_status" invisible="1"/>
                                                             </group>
                                                         </group>
                                                     </form>

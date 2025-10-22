@@ -5,12 +5,18 @@
         <field name="name">view.gdi.rental.contract.tree</field>
         <field name="model">rental.contract</field>
         <field name="arch" type="xml">
-            <tree string="Rental Contracts"> 
+            <tree string="Rental Contracts"
+                  decoration-muted="state in ['cancel']" 
+                  decoration-info="state in ['draft']" 
+                  decoration-danger="state == 'done'" 
+                  decoration-bf="state == 'signed'"
+            > 
                 <field name="name"/>
                 <field name="order_id"/>
                 <field name="partner_id"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
+                <field name="state"/>
             </tree>
         </field>
     </record>
