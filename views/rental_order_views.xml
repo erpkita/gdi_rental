@@ -213,7 +213,7 @@
                                     <field name="currency_id" invisible="1"/>
                                     <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
-                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-danger" attrs="{'column_invisible': [('parent.state', '!=', 'active')]}"/>
+                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-secondary" attrs="{'column_invisible': [('parent.state', '!=', 'ongoing')]}"/>
                                 </tree>
                                 <form>
                                     <header>

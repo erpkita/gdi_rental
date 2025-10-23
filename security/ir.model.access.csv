@@ -11,3 +11,4 @@ access_rental_contract_component_all,rental.contract.component all,model_rental_
 access_rental_contract_creation_wizard_all,rental.contract.creation.wizard all,model_rental_contract_creation_wizard,,1,1,1,1
 access_stock_rental_order_item_all,stock.rental.order.item all,model_stock_rental_order_item,,1,1,1,1
 access_rental_contract_wizard_line_all,rental.contract.wizard.line all,model_rental_contract_wizard_line,,1,1,1,1
+access_rental_item_hireoff_wizard_all,rental.item.hireoff.wizard all,model_rental_item_hireoff_wizard,,1,1,1,1

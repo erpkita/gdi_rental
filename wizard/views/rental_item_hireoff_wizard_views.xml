@@ -1,0 +1,26 @@
+<odoo>
+    <record id="view_rental_item_hireoff_wizard_form" model="ir.ui.view">
+        <field name="name">rental.item.hireoff.wizard.form</field>
+        <field name="model">rental.item.hireoff.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Hire-Off Rental Item" version="7.0">
+                <group string="Hire-Off Rental Item">
+                    <field name="rental_orderline_id" readonly="1"/>
+                    <field name="dest_location_id" required="1"/>
+                    <field name="reason" placeholder="Explain why this item is being hired off..." required="1"/>
+                </group>
+                <footer>
+                    <button string="Confirm" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_rental_item_hireoff_wizard" model="ir.actions.act_window">
+        <field name="name">Hire-Off Rental Item</field>
+        <field name="res_model">rental.item.hireoff.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -445,7 +445,13 @@ class GdiRentalOrder(models.Model):
             pass
 
     def _create_physical_inventory_hireoff(self, picking_type_id):
-        pass
+        for rec in self:
+            returned_lines = []
+            sq_no = 0
+
+            tobe_hiredoff_line_ids = rec.order_line.filtered(lambda x: x.rental_state == 'active')
+            # for line in tobe_hiredoff_line_ids:
+            #     last_
 
 
     def open_related_contract(self):

@@ -33,6 +33,7 @@
         'report/rental_delivery_order.xml',
         'report/rental_reports.xml',
         'wizard/views/rental_contract_creation_wizard_views.xml',
+        'wizard/views/rental_item_hireoff_wizard_views.xml',
         'views/product_views.xml',
         'views/rental_quotation_views.xml',
         'views/rental_order_views.xml',

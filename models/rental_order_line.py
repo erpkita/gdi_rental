@@ -574,4 +574,13 @@ class GDIRentalOrderLine(models.Model):
             return contract_line_vals
         
     def action_item_hireoff(self):
-        pass
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'rental.item.hireoff.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref('gdi_rental.view_rental_item_hireoff_wizard_form').id,
+            'target': 'new',
+            'context': {
+                'default_rental_orderline_id': self.id,
+            }
+        }

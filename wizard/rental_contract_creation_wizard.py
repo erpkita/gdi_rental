@@ -127,6 +127,11 @@ class RentalContractCreationWizard(models.TransientModel):
         for rec in self:
             rental_id = rec.rental_id
             if rental_id:
+                # before executing anything, we'll set the previous contract as innactive or done.
+                prev_contract_ids = rental_id.rental_contract_ids.sorted(key=lambda r: r.id, reverse=True)
+                lastest_contract = prev_contract_ids[:1]
+                lastest_contract.write({'state': 'done'})
+
                 contract_id =  self.env["rental.contract"].create(rec._get_rental_contract_vals(rental_id))
                 contract_id.write({
                     'date_definition_level': rec.date_definition_level

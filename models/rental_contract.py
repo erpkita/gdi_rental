@@ -398,9 +398,10 @@ class RentalContract(models.Model):
             'product_uom_qty': qty,
             'picking_id': picking.id,
             'rental_order_item_id': rental_item.id,
-            'ro_line_id': contract_line.ro_line_id.id
+            'ro_line_id': contract_line.ro_line_id.id,
+            'rental_order_component_id': component.id if component else False
         }
-        
+
         return self.env["stock.move"].create(move_vals)
 
     def _create_set_component_moves(self, contract_line, contract, picking, 
@@ -416,7 +417,8 @@ class RentalContract(models.Model):
             rental_item: rental order item record
             current_datetime: current datetime
         """
-        for component in contract_line.component_line_ids:
+        ro_line_component_ids = contract_line.ro_line_id.component_line_ids
+        for component in ro_line_component_ids:
             self._create_stock_move(
                 contract_line, contract, picking, picking_type,
                 rental_item, current_datetime, component=component
