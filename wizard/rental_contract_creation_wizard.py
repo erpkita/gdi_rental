@@ -17,7 +17,8 @@ class RentalContractCreationWizard(models.TransientModel):
             if not rental_id:
                 raise ValidationError(_("Invalid value on rental_id field. Please contact Administrator."))
             rental_item_ids = []
-            for item in rental_id.order_line:
+            rental_orderlines = rental_id.order_line.filtered(lambda line: line.rental_state == 'active')
+            for item in rental_orderlines:
                 rental_item_ids.append((
                     0, 0, {
                         'rental_order_line_id': item.id,

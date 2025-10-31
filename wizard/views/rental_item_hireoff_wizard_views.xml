@@ -1,4 +1,5 @@
 <odoo>
+
     <record id="view_rental_item_hireoff_wizard_form" model="ir.ui.view">
         <field name="name">rental.item.hireoff.wizard.form</field>
         <field name="model">rental.item.hireoff.wizard</field>
@@ -9,6 +10,9 @@
                     <field name="dest_location_id" required="1"/>
                     <field name="reason" placeholder="Explain why this item is being hired off..." required="1"/>
                 </group>
+                <div class="alert alert-info" role="alert">
+                    <strong>Note:</strong> This action will create a rental return transaction and update the physical inventory location for this item.
+                </div>
                 <footer>
                     <button string="Confirm" type="object" name="action_confirm" class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>

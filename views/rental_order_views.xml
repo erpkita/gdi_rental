@@ -30,7 +30,12 @@
                     <button name="action_start_rental" type="object" string="Start Rental" states="confirm" class="btn-primary" confirm="Are you absolutely sure?, Please double-check the rental period, customer details, and terms before proceeding."/>
                     <button name="action_create_contract" type="object" string="Extend &amp; Create New Contract" states="ongoing" class="btn-success"/>
                     <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="btn-info"/>
-                    <button name="action_hireoff" states="ongoing" string="Hire off" type="object" class="btn-danger"/>
+                    <button name="action_hireoff" 
+                            states="ongoing" 
+                            string="Hire off" 
+                            type="object" 
+                            class="btn-danger"
+                            confirm="Are you sure you want to hire-off this rental order? This will return all active rental items to inventory."/>
                     <button name="action_cancel" states="confirm" string="cancel" type="object"/>
                     <field name="state" widget="statusbar" statusbar_visible="confirm,ongoing,hireoff"/>
                 </header>
@@ -213,7 +218,7 @@
                                     <field name="currency_id" invisible="1"/>
                                     <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
-                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-secondary" attrs="{'column_invisible': [('parent.state', '!=', 'ongoing')]}"/>
+                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-secondary" attrs="{'invisible': ['|', ('parent.state', '!=', 'ongoing'), ('rental_state', '!=', 'active')]}"/>
                                 </tree>
                                 <form>
                                     <header>
