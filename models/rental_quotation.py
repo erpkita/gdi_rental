@@ -188,28 +188,39 @@ class RentalQuotation(models.Model):
 
     @api.depends("order_line", "order_line.duration", "order_line.duration_unit")
     def _compute_duration_from_lines(self):
+        """Compute header duration based on the longest line item duration."""
         for record in self:
-            record.update_header_duration()
+            if not record.order_line:
+                # No lines, keep current values or defaults
+                if not record.duration:
+                    record.duration = 1
+                if not record.duration_unit:
+                    record.duration_unit = 'month'
+                continue
+            
+            longest_days = 0
+            longest_duration = record.duration or 1
+            longest_unit = record.duration_unit or 'month'
+            
+            for line in record.order_line:
+                if not line.duration or not line.duration_unit:
+                    continue
+                line_days = record._convert_to_days(line.duration, line.duration_unit)
+                if line_days > longest_days:
+                    longest_days = line_days
+                    longest_duration = line.duration
+                    longest_unit = line.duration_unit
+            
+            # Only update if we found a longer duration
+            if longest_days > 0:
+                record.duration = longest_duration
+                record.duration_unit = longest_unit
 
     def _inverse_duration(self):
-        # Just allow the fields to be editable.
-        pass    
-    
-    def update_header_duration(self):
-        """Update header duration based on longest line item"""
-        longest_days = 0
-        longest_duration = self.duration
-        longest_unit = self.duration_unit
-        
-        for line in self.order_line:
-            line_days = self._convert_to_days(line.duration, line.duration_unit)
-            if line_days > longest_days:
-                longest_days = line_days
-                longest_duration = line.duration
-                longest_unit = line.duration_unit
-        
-        self.duration = longest_duration
-        self.duration_unit = longest_unit
+        """Allow manual editing of header duration without affecting lines."""
+        # This allows users to manually set header duration
+        # Lines maintain their own independent durations
+        pass
 
     @api.model
     def create(self, vals):

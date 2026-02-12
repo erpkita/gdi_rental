@@ -51,7 +51,12 @@ class RentalQuotationLine(models.Model):
     
     item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
 
-    start_date = fields.Date(string="Start Date", related="quotation_id.start_date", store=True)
+    start_date = fields.Date(
+        string="Start Date", 
+        required=True,
+        default=fields.Date.today,
+        help="Start date for this rental item. Can be different from quotation header start date."
+    )
     end_date = fields.Date(string="End Date", compute='_compute_end_date', store=True)
     
     @api.depends('start_date', 'duration', 'duration_unit')
@@ -84,13 +89,7 @@ class RentalQuotationLine(models.Model):
                                          "quotation_line_id", 
                                          string="Components")
 
-    _sql_constraint = [
-        (
-            'check_end_date',
-            'CHECK (end_date > start_date)',
-            'The end date must be after the start date.'
-        )
-    ]
+    # SQL constraint removed - using Python constraint instead for better control and error messages
 
     # Fields for forecast widget
     product_type = fields.Selection(related='product_id.type', string="Product Type")
@@ -169,6 +168,24 @@ class RentalQuotationLine(models.Model):
         help='Quick stock information display'
     )
     
+
+    @api.constrains('start_date', 'end_date', 'duration')
+    def _check_rental_period(self):
+        """Validate rental period dates and duration."""
+        for record in self:
+            # Check if end_date is after start_date
+            if record.start_date and record.end_date:
+                if record.end_date <= record.start_date:
+                    raise ValidationError(
+                        _("End date must be after start date for line: %sStart: %s, End: %s") % 
+                        (record.name or 'Unnamed', record.start_date, record.end_date)
+                    )
+            
+            # Check if duration is positive
+            if record.duration and record.duration <= 0:
+                raise ValidationError(
+                    _("Duration must be greater than zero for line: %s") % (record.name or 'Unnamed')
+                )
 
 
     @api.depends('product_id')
@@ -290,7 +307,8 @@ class RentalQuotationLine(models.Model):
             if quotation:
                 res.update({
                     "duration": quotation.duration,
-                    "duration_unit": quotation.duration_unit
+                    "duration_unit": quotation.duration_unit,
+                    "start_date": quotation.start_date,  # Set default from header
                 })
         
         return res
@@ -314,11 +332,29 @@ class RentalQuotationLine(models.Model):
                 'price_subtotal': taxes['total_excluded'],
             })
 
+    @api.constrains('item_type', 'component_line_ids')
+    def _check_set_components(self):
+        """Validate that SET type items have at least one component."""
+        for record in self:
+            if record.item_type == 'set' and not record.component_line_ids:
+                raise ValidationError(
+                    _("SET type items must have at least one component.\n"
+                      "Please add components or change the type to UNIT.\n"
+                      "Line: %s") % (record.name or 'Unnamed')
+                )
+
     @api.onchange('item_type')
     def onchange_item_type(self):
         for rec in self:
-            rec.product_id = False
-            rec.product_uom_txt = 'SET'
+            # Clear product when changing to SET
+            if rec.item_type == 'set':
+                rec.product_id = False
+                rec.product_uom_txt = 'SET'
+            
+            # Clear components when changing to UNIT to prevent orphaned records
+            if rec.item_type == 'unit' and rec.component_line_ids:
+                rec.component_line_ids = [(5, 0, 0)]  # Delete all components
+                rec.product_uom_txt = ''
 
     @api.onchange('product_id')
     def product_id_change(self):
@@ -350,9 +386,10 @@ class RentalQuotationLine(models.Model):
             self.update(vals)
             return
         
-        if not self.product_uom or (self.product_id.uom_id.id != self.product_uom.id):
+        # Only set UOM if it's not already set (new line or product just selected)
+        # This allows users to change UOM to other units in the same category
+        if not self.product_uom:
             vals['product_uom'] = self.product_id.uom_id
-            vals['product_uom_qty'] = self.product_uom_qty or 1.0
             vals['product_uom_txt'] = self.product_id.uom_id.name
 
         product = self.product_id.with_context(
