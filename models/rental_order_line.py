@@ -1,298 +1,326 @@
 # -*- coding: utf-8 -*-
 
-
+import logging
 from datetime import timedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import ValidationError
 from odoo.tools.misc import get_lang
-
 from dateutil.relativedelta import relativedelta
 
-class GDIRentalOrderLine(models.Model):
+_logger = logging.getLogger(__name__)
+
+
+class GdiRentalOrderLine(models.Model):
     _name = 'gdi.rental.order.line'
     _description = 'Rental Order Line'
     _order = 'order_id, sequence, id'
 
-    order_id = fields.Many2one('gdi.rental.order', string='RO Reference', required=True,
-                                   ondelete='cascade', index=True, copy=False)
-    name = fields.Text(string='Description', required=True)
+    # -------------------------------------------------------------------------
+    # FIELDS
+    # -------------------------------------------------------------------------
+
+    # --- Parent ---
+    order_id = fields.Many2one(
+        'gdi.rental.order', string='RO Reference', required=True,
+        ondelete='cascade', index=True, copy=False)
     sequence = fields.Integer(string='Sequence', default=10)
-    item_code = fields.Char(string="Item Code", required=True)
-    product_id = fields.Many2one('product.product', string='Product', 
-                                 domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
-                                 change_default=True, ondelete='restrict')  # Unrequired company
+
+    # --- Item Type ---
+    item_type = fields.Selection([
+        ('unit', 'Unit'),
+        ('set', 'Set'),
+    ], string='Type', default='unit', required=True)
+
+    # --- Product ---
+    product_id = fields.Many2one(
+        'product.product', string='Product',
+        domain="[('sale_ok', '=', True), "
+               "'|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        change_default=True, ondelete='restrict')
     product_template_id = fields.Many2one(
         'product.template', string='Product Template',
-        related="product_id.product_tmpl_id", domain=[('sale_ok', '=', True)])
+        related='product_id.product_tmpl_id',
+        domain="[('sale_ok', '=', True)]")
+    name = fields.Text(string='Description', required=True)
+    item_code = fields.Char(string='Item Code', required=True)
 
-    product_uom_qty = fields.Float(string='Quantity', digits='Product Unit of Measure', required=True, default=1.0)
-    product_uom = fields.Many2one('uom.uom', 
-                                  string='Unit of Measure', 
-                                  domain="[('category_id', '=', product_uom_category_id)]", 
-                                  ondelete="restrict")
-    product_uom_category_id = fields.Many2one(related='product_id.uom_id.category_id')
-    product_uom_txt = fields.Char(string="Uom", default="")
+    # --- Quantity & UOM ---
+    product_uom_qty = fields.Float(
+        string='Quantity', digits='Product Unit of Measure',
+        required=True, default=1.0)
+    product_uom_category_id = fields.Many2one(
+        'uom.category', related='product_id.uom_id.category_id')
+    product_uom = fields.Many2one(
+        'uom.uom', string='Unit of Measure',
+        domain="[('category_id', '=', product_uom_category_id)]",
+        ondelete='restrict')
+    product_uom_txt = fields.Char(string='UOM Text', default='')
 
-    price_unit = fields.Float('Unit Price', required=True, digits='Product Price', default=0.0)
-    price_subtotal = fields.Monetary(compute='_compute_amount', string='Subtotal', store=True)
-    price_tax = fields.Float(compute='_compute_amount', string='Total Tax', store=True)
-    price_total = fields.Monetary(compute='_compute_amount', string='Total', store=True)
+    # --- Pricing ---
+    price_unit = fields.Float(
+        string='Unit Price', required=True,
+        digits='Product Price', default=0.0)
+    discount = fields.Float(
+        string='Discount (%)', digits='Discount', default=0.0)
+    price_subtotal = fields.Monetary(
+        string='Subtotal', store=True, compute='_compute_amount')
+    price_tax = fields.Float(
+        string='Total Tax', store=True, compute='_compute_amount')
+    price_total = fields.Monetary(
+        string='Total', store=True, compute='_compute_amount')
+    tax_id = fields.Many2many(
+        'account.tax', string='Taxes', context={'active_test': False})
 
-    tax_id = fields.Many2many('account.tax', string='Taxes', context={'active_test': False})
-    discount = fields.Float(string='Discount (%)', digits='Discount', default=0.0)
-
-    salesman_id = fields.Many2one(related='order_id.user_id', store=True, string='Salesperson')
-    currency_id = fields.Many2one(related='order_id.currency_id', depends=['order_id.currency_id'], store=True, string='Currency')
-    company_id = fields.Many2one(related='order_id.company_id', string='Company', store=True, index=True)
-    order_partner_id = fields.Many2one(related='order_id.partner_id', store=True, string='Customer', index=True)
-    state = fields.Selection(
-        related='order_id.state', string='Order Status', copy=False, store=True)
-    
-    item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], default='unit', string="Type", required=True)
-    date_definition_level = fields.Selection(
-        related="order_id.date_definition_level", string="Date Definition Level",
-       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level."
-    )
-
-    duration = fields.Integer(string="Duration", required=True)
+    # --- Duration ---
+    duration = fields.Integer(string='Duration', required=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
-        ('month', 'Months')
-    ], string="Unit", required=True)
+        ('week', 'Weeks'),
+        ('month', 'Months'),
+    ], string='Unit', required=True)
+    duration_string = fields.Char(
+        string='Duration Str', compute='_compute_duration_str')
 
-    available_qty = fields.Float(string="Available Qty", compute="_get_available_qty")
-    src_location_id = fields.Many2one("stock.location", string="Source Location")
-    available_src_location_ids = fields.Many2many("stock.location", string="Src Location Ids", compute="_get_available_src_location")
-    available_src_location_txt = fields.Text("Available Src Location", compute="_get_available_src_location")    
-    
-    component_line_ids = fields.One2many("rental.order.component", 
-                                         "order_line_id", 
-                                         string="Components")
-    
-    start_date = fields.Date(string="Start Date", compute='_compute_start_date', store=True, inverse='_inverse_start_date')
-    end_date = fields.Date(string="End Date", compute='_compute_end_date', store=True, inverse='_inverse_end_date')
+    # --- Dates ---
+    start_date = fields.Date(
+        string='Start Date',
+        compute='_compute_start_date', store=True,
+        inverse='_inverse_start_date')
+    end_date = fields.Date(
+        string='End Date',
+        compute='_compute_end_date', store=True,
+        inverse='_inverse_end_date')
+    date_definition_level = fields.Selection(
+        related='order_id.date_definition_level',
+        string='Date Definition Level')
 
-    duration_string = fields.Char(string="Duration Str", compute="_compute_duration_str")
+    # --- Components (SET only) ---
+    component_line_ids = fields.One2many(
+        'rental.order.component', 'order_line_id',
+        string='Components')
 
+    # --- Rental State ---
     rental_state = fields.Selection([
         ('draft', 'Draft'),
         ('active', 'Active'),
-        ('hireoff', 'Hired-Off')
-    ], string="Rental Status", default="draft")
+        ('hireoff', 'Hired-Off'),
+    ], string='Rental Status', default='draft')
 
-    # Fields for forecast widget
-    product_type = fields.Selection(related='product_id.type', string="Product Type")
+    # --- Related / Convenience ---
+    salesman_id = fields.Many2one(
+        related='order_id.user_id', store=True, string='Salesperson')
+    currency_id = fields.Many2one(
+        related='order_id.currency_id',
+        depends=['order_id.currency_id'], store=True)
+    company_id = fields.Many2one(
+        related='order_id.company_id', store=True, index=True)
+    order_partner_id = fields.Many2one(
+        related='order_id.partner_id', store=True, index=True)
+    state = fields.Selection(
+        related='order_id.state', store=True, copy=False)
+    product_type = fields.Selection(
+        related='product_id.type', string='Product Type')
+
+    # --- Stock Moves ---
+    stock_move_ids = fields.One2many(
+        'stock.move', 'ro_line_id', string='Stock Moves')
+
+    # --- Stock Availability (computed) ---
+    available_qty = fields.Float(
+        string='Available Qty', compute='_compute_available_qty')
+    src_location_id = fields.Many2one(
+        'stock.location', string='Source Location')
+    available_src_location_ids = fields.Many2many(
+        'stock.location', string='Src Location Ids',
+        compute='_compute_available_src_location')
+    available_src_location_txt = fields.Text(
+        string='Available Src Location',
+        compute='_compute_available_src_location')
+
+    # --- Stock Forecast ---
     virtual_available_at_date = fields.Float(
         compute='_compute_qty_at_date',
-        digits='Product Unit of Measure',
-        string='Forecast Quantity',
-    )
+        digits='Product Unit of Measure', string='Forecast Quantity')
     qty_available_today = fields.Float(
         compute='_compute_qty_at_date',
-        digits='Product Unit of Measure',
-        string='Available Today',
-    )
+        digits='Product Unit of Measure', string='Available Today')
     free_qty_today = fields.Float(
         compute='_compute_qty_at_date',
-        digits='Product Unit of Measure',
-        string='Free Quantity Today',
-    )
+        digits='Product Unit of Measure', string='Free Quantity Today')
     scheduled_date = fields.Datetime(
         string='Scheduled Date',
-        compute='_compute_scheduled_date',
-        store=True
-    )
+        compute='_compute_scheduled_date', store=True)
     forecast_expected_date = fields.Datetime(
-        compute='_compute_qty_at_date',
-        string='Expected Date'
-    )
+        compute='_compute_qty_at_date', string='Expected Date')
     warehouse_id = fields.Many2one(
-        'stock.warehouse',
-        string='Warehouse',
-        compute='_compute_warehouse_id',
-        store=True,
-        check_company=True
-    )
-
+        'stock.warehouse', string='Warehouse',
+        compute='_compute_warehouse_id', store=True, check_company=True)
     is_mto = fields.Boolean(
-        string="Is Made to Order",
-        compute="_compute_is_mto",
-        store=False
-    )
-
+        string='Is Made to Order', compute='_compute_is_mto')
     qty_to_delivery = fields.Float(
-        string="Quantity to Deliver",
-        compute="_compute_qty_to_deliver",
-        digits='Product Unit of Measure',
-        store=False
-    )
+        string='Quantity to Deliver',
+        compute='_compute_qty_to_deliver',
+        digits='Product Unit of Measure')
 
-    # Enhanced stock visibility fields
+    # --- Enhanced stock visibility ---
     current_stock_qty = fields.Float(
-        string='Current Stock',
-        compute='_compute_stock_quantities',
-        digits='Product Unit of Measure',
-        help='Current available quantity in warehouse'
-    )
-    
+        string='Current Stock', compute='_compute_stock_quantities',
+        digits='Product Unit of Measure')
     virtual_stock_qty = fields.Float(
-        string='Forecast Stock',
-        compute='_compute_stock_quantities', 
-        digits='Product Unit of Measure',
-        help='Forecasted quantity (current + incoming - outgoing)'
-    )
-    
+        string='Forecast Stock', compute='_compute_stock_quantities',
+        digits='Product Unit of Measure')
     stock_status = fields.Selection([
         ('in_stock', 'In Stock'),
         ('low_stock', 'Low Stock'),
         ('out_of_stock', 'Out of Stock'),
-        ('no_product', 'No Product Selected')
+        ('no_product', 'No Product Selected'),
     ], string='Stock Status', compute='_compute_stock_quantities')
-    
     stock_info_display = fields.Char(
-        string='Stock Info',
-        compute='_compute_stock_quantities',
-        help='Quick stock information display'
-    )
-    stock_move_ids = fields.One2many("stock.move", "ro_line_id", string="Stock Moves")
+        string='Stock Info', compute='_compute_stock_quantities')
+
+    # -------------------------------------------------------------------------
+    # COMPUTE — AMOUNTS
+    # -------------------------------------------------------------------------
+
+    @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
+    def _compute_amount(self):
+        for line in self:
+            price = line.price_unit * (1 - (line.discount or 0.0) / 100.0)
+            taxes = line.tax_id.compute_all(
+                price, line.order_id.currency_id,
+                line.product_uom_qty,
+                product=line.product_id,
+                partner=line.order_id.partner_shipping_id)
+            line.price_tax = sum(
+                t.get('amount', 0.0) for t in taxes.get('taxes', []))
+            line.price_total = taxes['total_included']
+            line.price_subtotal = taxes['total_excluded']
+
+    # -------------------------------------------------------------------------
+    # COMPUTE — DURATION & DATES
+    # -------------------------------------------------------------------------
 
     @api.depends('duration', 'duration_unit')
     def _compute_duration_str(self):
-        for record in self:
-            duration_unit = dict(self._fields['duration_unit'].selection).get(record.duration_unit, 'Not Defined')
-            record.duration_string = f"{record.duration} {duration_unit}"
+        labels = dict(self._fields['duration_unit'].selection)
+        for line in self:
+            line.duration_string = f"{line.duration} {labels.get(line.duration_unit, '')}"
 
-    @api.model
-    def default_get(self, fields_list):
-        res = super(GDIRentalOrderLine, self).default_get(fields_list)
-
-        if self._context.get("default_order_id"):
-            order_id = self._context.get("default_order_id")
-            order = self.env["gdi.rental.order"].browse(order_id)
-            if order:
-                res.update({
-                    "duration": order.duration,
-                    "duration_unit": order.duration_unit,
-                    "start_date": order.start_date
-                })
-        
-        return res
-    
     @api.depends('order_id', 'order_id.start_date')
     def _compute_start_date(self):
-        for record in self:
-            start_date = record.order_id.start_date
-            record.start_date = start_date
-    
+        for line in self:
+            line.start_date = line.order_id.start_date
+
     def _inverse_start_date(self):
         pass
-    
+
     @api.depends('start_date', 'duration', 'duration_unit')
     def _compute_end_date(self):
-        for record in self:
-            if not record.start_date:
-                record.end_date = False
+        delta_map = {
+            'hour': lambda d: relativedelta(hours=d),
+            'day': lambda d: relativedelta(days=d),
+            'week': lambda d: relativedelta(weeks=d),
+            'month': lambda d: relativedelta(months=d),
+        }
+        for line in self:
+            if not line.start_date or not line.duration_unit:
+                line.end_date = False
                 continue
-                
-            if record.duration_unit == 'hour':
-                record.end_date = record.start_date + relativedelta(hours=record.duration)
-            elif record.duration_unit == 'day':
-                record.end_date = record.start_date + relativedelta(days=record.duration)
-            elif record.duration_unit == 'week':
-                record.end_date = record.start_date + relativedelta(weeks=record.duration)
-            elif record.duration_unit == 'month':
-                record.end_date = record.start_date + relativedelta(months=record.duration)
+            delta_fn = delta_map.get(line.duration_unit)
+            line.end_date = (
+                line.start_date + delta_fn(line.duration)
+                if delta_fn else False)
 
     def _inverse_end_date(self):
         pass
 
-    @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
-    def _compute_amount(self):
-        """
-        Compute the amounts of the SO line.
-        """
+    @api.depends('start_date')
+    def _compute_scheduled_date(self):
         for line in self:
-            price = line.price_unit * (1 - (line.discount or 0.0) / 100.0)
-            taxes = line.tax_id.compute_all(price, line.order_id.currency_id, line.product_uom_qty, product=line.product_id, partner=line.order_id.partner_shipping_id)
-            line.update({
-                'price_tax': sum(t.get('amount', 0.0) for t in taxes.get('taxes', [])),
-                'price_total': taxes['total_included'],
-                'price_subtotal': taxes['total_excluded'],
-            })
+            line.scheduled_date = (
+                fields.Datetime.to_datetime(line.start_date)
+                if line.start_date else False)
+
+    # -------------------------------------------------------------------------
+    # COMPUTE — STOCK
+    # -------------------------------------------------------------------------
+
+    @api.depends('order_id.warehouse_id', 'company_id')
+    def _compute_warehouse_id(self):
+        for line in self:
+            if hasattr(line.order_id, 'warehouse_id') and line.order_id.warehouse_id:
+                line.warehouse_id = line.order_id.warehouse_id
+            elif line.company_id:
+                line.warehouse_id = self.env['stock.warehouse'].search(
+                    [('company_id', '=', line.company_id.id)], limit=1)
+            else:
+                line.warehouse_id = False
 
     @api.depends('product_id', 'src_location_id')
-    def _get_available_qty(self):
-        for rec in self:
-            rec.available_qty = 0
-            if rec.product_id and rec.src_location_id:
-                quant_query = """
-                    SELECT SUM(quantity) AS total_qty FROM stock_quant
-                    WHERE location_id = %s AND product_id = %s 
-                """
-                self._cr.execute(quant_query, (rec.src_location_id.id, rec.product_id.id, ))
-                results = self._cr.dictfetchall()
-                if results:
-                    for stock in results:
-                        rec.available_qty = stock['total_qty']
-    
-    @api.depends('product_id')
-    def _get_available_src_location(self):
-        for rec in self:
-            if not rec.product_id:
-                rec.available_src_location_txt = '-'
-                rec.available_src_location_ids = False
-            else:
-                quant_query = """
-                    SELECT loc.id AS location_id, SUM(quant.quantity) AS total_qty FROM stock_quant AS quant, stock_location AS loc
-                    WHERE loc.usage = 'internal' AND
-                          quant.location_id = loc.id AND
-                          quant.quantity != 0.0 AND
-                          quant.product_id = %s GROUP BY loc.id
-                """
-                self._cr.execute(quant_query, (rec.product_id.id, ))
-                results = self._cr.dictfetchall()
-                rec.available_src_location_txt = 'N/A'
-                if len(results) > 0:
-                    avail_stock_qty_txt = ''
-                    location_ids = []
-                    for stock in results:
-                        location_id = self.env['stock.location'].browse(stock['location_id'])
-                        location_ids.append(location_id.id)
-                        availstock_location_text = '{} ({}) \n'.format(location_id.display_name, str(stock['total_qty']))
-                        avail_stock_qty_txt += availstock_location_text
-                    rec.available_src_location_txt = avail_stock_qty_txt
-                    rec.available_src_location_ids = self.env['stock.location'].browse(location_ids)
-                else:
-                    rec.available_src_location_txt = 'N/A'
-                    rec.available_src_location_ids = False
+    def _compute_available_qty(self):
+        for line in self:
+            line.available_qty = 0.0
+            if line.product_id and line.src_location_id:
+                self._cr.execute("""
+                    SELECT COALESCE(SUM(quantity), 0)
+                    FROM stock_quant
+                    WHERE location_id = %s AND product_id = %s
+                """, (line.src_location_id.id, line.product_id.id))
+                result = self._cr.fetchone()
+                line.available_qty = result[0] if result else 0.0
 
-    # Stock Forecast Methods
+    @api.depends('product_id')
+    def _compute_available_src_location(self):
+        for line in self:
+            if not line.product_id:
+                line.available_src_location_txt = '-'
+                line.available_src_location_ids = False
+                continue
+
+            self._cr.execute("""
+                SELECT loc.id, COALESCE(SUM(quant.quantity), 0) AS qty
+                FROM stock_quant AS quant
+                JOIN stock_location AS loc ON quant.location_id = loc.id
+                WHERE loc.usage = 'internal'
+                  AND quant.quantity != 0.0
+                  AND quant.product_id = %s
+                GROUP BY loc.id
+            """, (line.product_id.id,))
+            rows = self._cr.dictfetchall()
+
+            if rows:
+                texts = []
+                loc_ids = []
+                for row in rows:
+                    loc = self.env['stock.location'].browse(row['id'])
+                    loc_ids.append(loc.id)
+                    texts.append(f"{loc.display_name} ({row['qty']})")
+                line.available_src_location_txt = '\n'.join(texts)
+                line.available_src_location_ids = self.env['stock.location'].browse(loc_ids)
+            else:
+                line.available_src_location_txt = 'N/A'
+                line.available_src_location_ids = False
+
     @api.depends('product_id')
     def _compute_is_mto(self):
-        """Check if product is Make to Order."""
+        mto_route = self.env.ref('stock.route_warehouse0_mto', raise_if_not_found=False)
         for line in self:
-            if line.product_id and line.product_type == 'product':
-                # Check if product has MTO route
-                mto_route = self.env.ref('stock.route_warehouse0_mto', raise_if_not_found=False)
-                if mto_route:
-                    line.is_mto = mto_route in line.product_id.route_ids
-                else:
-                    line.is_mto = False
+            if line.product_id and line.product_type == 'product' and mto_route:
+                line.is_mto = mto_route in line.product_id.route_ids
             else:
                 line.is_mto = False
 
     @api.depends('product_uom_qty', 'qty_available_today')
     def _compute_qty_to_deliver(self):
-        """Compute quantity that needs to be delivered."""
         for line in self:
-            line.qty_to_delivery = max(0, line.product_uom_qty - line.qty_available_today)
+            line.qty_to_delivery = max(
+                0, line.product_uom_qty - line.qty_available_today)
 
-    @api.depends('product_id', 'product_uom_qty', 'start_date', 'warehouse_id', 'product_type')
+    @api.depends('product_id', 'product_uom_qty', 'start_date',
+                 'warehouse_id', 'product_type')
     def _compute_qty_at_date(self):
-        """Compute forecast quantities for the product at the scheduled date."""
         for line in self:
             if not line.product_id or line.product_type != 'product':
                 line.virtual_available_at_date = 0.0
@@ -302,23 +330,15 @@ class GDIRentalOrderLine(models.Model):
                 continue
 
             try:
-                # Get warehouse context
-                warehouse = line.warehouse_id.id if line.warehouse_id else False
-                
-                # Get current quantities
-                product_ctx = line.product_id.with_context(warehouse=warehouse)
-                line.qty_available_today = product_ctx.qty_available or 0.0
-                line.free_qty_today = product_ctx.free_qty or 0.0
+                wh = line.warehouse_id.id if line.warehouse_id else False
+                product = line.product_id.with_context(warehouse=wh)
+                line.qty_available_today = product.qty_available or 0.0
+                line.free_qty_today = product.free_qty or 0.0
 
-                # Get forecast at scheduled date
                 if line.scheduled_date:
-                    product_forecast = line.product_id.with_context(
-                        warehouse=warehouse,
-                        to_date=line.scheduled_date
-                    )
-                    line.virtual_available_at_date = product_forecast.virtual_available or 0.0
-                    
-                    # Calculate expected date if quantity is insufficient
+                    forecast = line.product_id.with_context(
+                        warehouse=wh, to_date=line.scheduled_date)
+                    line.virtual_available_at_date = forecast.virtual_available or 0.0
                     if line.virtual_available_at_date < line.product_uom_qty:
                         line.forecast_expected_date = line._get_forecast_expected_date()
                     else:
@@ -326,58 +346,14 @@ class GDIRentalOrderLine(models.Model):
                 else:
                     line.virtual_available_at_date = line.free_qty_today
                     line.forecast_expected_date = False
-                    
-            except Exception as e:
-                # Fallback to safe defaults if there's any error
+            except Exception:
                 line.virtual_available_at_date = 0.0
                 line.qty_available_today = 0.0
                 line.free_qty_today = 0.0
                 line.forecast_expected_date = False
 
-    @api.depends('start_date')
-    def _compute_scheduled_date(self):
-        """Compute scheduled date based on start date."""
-        for line in self:
-            if line.start_date:
-                # Convert date to datetime (start of day in UTC)
-                line.scheduled_date = fields.Datetime.to_datetime(line.start_date)
-            else:
-                line.scheduled_date = False
-
-    @api.depends('order_id.warehouse_id', 'company_id')
-    def _compute_warehouse_id(self):
-        """Get warehouse from order or company default."""
-        for line in self:
-            if hasattr(line.order_id, 'warehouse_id') and line.order_id.warehouse_id:
-                line.warehouse_id = line.order_id.warehouse_id
-            elif line.company_id:
-                warehouse = self.env['stock.warehouse'].search([
-                    ('company_id', '=', line.company_id.id)
-                ], limit=1)
-                line.warehouse_id = warehouse
-            else:
-                line.warehouse_id = False
-
-    def _get_forecast_expected_date(self):
-        """Calculate the expected date when stock will be available."""
-        self.ensure_one()
-        if not self.product_id:
-            return False
-            
-        # Look for incoming stock moves
-        moves = self.env['stock.move'].search([
-            ('product_id', '=', self.product_id.id),
-            ('state', 'not in', ['done', 'cancel']),
-            ('date', '>', fields.Datetime.now()),
-            ('location_dest_id.usage', '=', 'internal')
-        ], order='date', limit=1)
-        
-        return moves.date if moves else False
-
-    # Enhanced Stock Visibility Methods
     @api.depends('product_id', 'warehouse_id')
     def _compute_stock_quantities(self):
-        """Compute current and forecast stock quantities with status"""
         for line in self:
             if not line.product_id:
                 line.current_stock_qty = 0.0
@@ -385,17 +361,14 @@ class GDIRentalOrderLine(models.Model):
                 line.stock_status = 'no_product'
                 line.stock_info_display = 'No Product Selected'
                 continue
-                
-            # Get warehouse context
-            warehouse_id = line.warehouse_id.id if line.warehouse_id else line.env.user.company_id.warehouse_id.id
-            
-            # Get stock quantities with warehouse context
-            product_with_context = line.product_id.with_context(warehouse=warehouse_id)
-            
-            line.current_stock_qty = product_with_context.qty_available
-            line.virtual_stock_qty = product_with_context.virtual_available
-            
-            # Determine stock status
+
+            wh = (line.warehouse_id.id
+                  if line.warehouse_id
+                  else line.env.user.company_id.warehouse_id.id)
+            product = line.product_id.with_context(warehouse=wh)
+            line.current_stock_qty = product.qty_available
+            line.virtual_stock_qty = product.virtual_available
+
             if line.current_stock_qty > 0:
                 if line.current_stock_qty >= line.product_uom_qty:
                     line.stock_status = 'in_stock'
@@ -403,184 +376,238 @@ class GDIRentalOrderLine(models.Model):
                     line.stock_status = 'low_stock'
             else:
                 line.stock_status = 'out_of_stock'
-            
-            # Create display string
-            line.stock_info_display = f"Available: {line.current_stock_qty:.0f} | Forecast: {line.virtual_stock_qty:.0f}"
-    
-    @api.onchange('product_id')
-    def _onchange_product_stock_info(self):
-        """Trigger stock computation when product is selected - no popup warnings"""
-        # Just trigger recomputation of stock fields - the widget will show the inline info
-        pass
-    
-    def action_view_stock_forecast(self):
-        """Open the stock forecast (replenishment) page for the selected product"""
+
+            line.stock_info_display = (
+                f"Available: {line.current_stock_qty:.0f} | "
+                f"Forecast: {line.virtual_stock_qty:.0f}")
+
+    def _get_forecast_expected_date(self):
         self.ensure_one()
         if not self.product_id:
             return False
+        moves = self.env['stock.move'].search([
+            ('product_id', '=', self.product_id.id),
+            ('state', 'not in', ['done', 'cancel']),
+            ('date', '>', fields.Datetime.now()),
+            ('location_dest_id.usage', '=', 'internal'),
+        ], order='date', limit=1)
+        return moves.date if moves else False
 
-        # Get warehouse
-        warehouse_id = self.warehouse_id.id if self.warehouse_id else self.env.user.company_id.warehouse_id.id
+    # -------------------------------------------------------------------------
+    # DEFAULT GET
+    # -------------------------------------------------------------------------
 
-        # Get the existing stock replenishment action
-        action = self.env.ref('stock.stock_replenishment_product_product_action').read()[0]
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if self._context.get('default_order_id'):
+            order = self.env['gdi.rental.order'].browse(
+                self._context['default_order_id'])
+            if order:
+                res.update({
+                    'duration': order.duration,
+                    'duration_unit': order.duration_unit,
+                    'start_date': order.start_date,
+                })
+        return res
 
-        # Customize the domain and context
+    # -------------------------------------------------------------------------
+    # HELPERS
+    # -------------------------------------------------------------------------
+
+    def _get_rental_pricing_list(self, product):
+        if not product or not product.rental_pricing_ids:
+            return False
+        return {p.unit: p.price for p in product.rental_pricing_ids}
+
+    def _compute_rental_price(self):
+        """Compute price_unit based on rental pricing. NEVER touches qty."""
+        if not self.product_id:
+            return
+
+        product = self.product_id.with_context(
+            partner=self.order_id.partner_id,
+            quantity=self.product_uom_qty,
+            date=self.order_id.date_order,
+            pricelist=self.order_id.pricelist_id.id,
+            uom=self.product_uom.id if self.product_uom else False)
+
+        if not (self.order_id.pricelist_id and self.order_id.partner_id):
+            return
+
+        pricing = self._get_rental_pricing_list(product)
+        if not pricing:
+            raise ValidationError(
+                _("Rental price for duration '%s' is not configured for this "
+                  "product.") % self.duration_unit)
+        if self.duration_unit not in pricing:
+            available = ', '.join(pricing.keys())
+            raise ValidationError(
+                _("This product is not available for rental by %s. "
+                  "Available: %s.") % (self.duration_unit, available))
+
+        rental_price = pricing[self.duration_unit] * self.duration
+        self.price_unit = product._get_tax_included_unit_price(
+            self.company_id,
+            self.order_id.currency_id,
+            self.order_id.date_order,
+            'sale',
+            fiscal_position=self.order_id.fiscal_position_id,
+            product_price_unit=rental_price,
+            product_currency=self.order_id.currency_id)
+
+    # -------------------------------------------------------------------------
+    # CRUD (debug logging)
+    # -------------------------------------------------------------------------
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for i, vals in enumerate(vals_list):
+            _logger.info("=" * 60)
+            _logger.info("RO LINE CREATE - Line %d", i)
+            _logger.info("  product_uom_qty: %s",
+                         vals.get('product_uom_qty', '*** NOT IN VALS ***'))
+            _logger.info("  product_uom: %s",
+                         vals.get('product_uom', '*** NOT IN VALS ***'))
+            _logger.info("=" * 60)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if 'product_uom_qty' in vals:
+            _logger.info("RO LINE WRITE - qty=%s for IDs=%s",
+                         vals['product_uom_qty'], self.ids)
+        return super().write(vals)
+
+    # -------------------------------------------------------------------------
+    # ONCHANGES
+    #
+    # Same rules as quotation line:
+    #   1. NEVER set product_uom_qty
+    #   2. NEVER use self.update(dict)
+    #   3. ONE onchange per trigger field
+    # -------------------------------------------------------------------------
+
+    @api.onchange('item_type')
+    def _onchange_item_type(self):
+        if self.item_type == 'set':
+            self.product_id = False
+            self.product_uom_txt = 'SET'
+        elif self.item_type == 'unit':
+            if self.component_line_ids:
+                self.component_line_ids = [(5, 0, 0)]
+            self.product_uom_txt = ''
+
+    @api.onchange('product_id')
+    def _onchange_product_id(self):
+        """Set description, UOM, and price. NEVER touches qty."""
+        if not self.product_id:
+            self.product_uom = False
+            self.product_uom_txt = 'SET' if self.item_type == 'set' else ''
+            self.price_unit = 0.0
+            self.name = False
+            return
+
+        lang = get_lang(self.env, self.order_id.partner_id.lang).code
+        product = self.product_id.with_context(lang=lang)
+        self.name = product.display_name
+
+        if (not self.product_uom
+                or self.product_uom.category_id != self.product_id.uom_id.category_id):
+            self.product_uom = self.product_id.uom_id
+            self.product_uom_txt = self.product_id.uom_id.name
+
+        self._compute_rental_price()
+
+    @api.onchange('duration', 'duration_unit')
+    def _onchange_duration(self):
+        if self.product_id:
+            self._compute_rental_price()
+
+    @api.onchange('component_line_ids')
+    def _onchange_component_line_ids(self):
+        if self.item_type == 'set':
+            self.price_unit = sum(
+                c.price_subtotal for c in self.component_line_ids)
+
+    # -------------------------------------------------------------------------
+    # BUSINESS METHODS
+    # -------------------------------------------------------------------------
+
+    def check_rental_period(self):
+        for line in self:
+            if not line.start_date:
+                raise ValidationError(
+                    _("Start date for item '%s' is not defined.") % line.item_code)
+            if not line.end_date:
+                raise ValidationError(
+                    _("End date for item '%s' is not defined.") % line.item_code)
+
+    def _get_contract_line_vals(self):
+        """Prepare contract line values from this order line."""
+        self.ensure_one()
+        vals = {
+            'name': self.name or '',
+            'item_code': self.item_code or '',
+            'sequence': self.sequence or 10,
+            'product_id': self.product_id.id or False,
+            'product_template_id': self.product_template_id.id or False,
+            'product_uom_qty': self.product_uom_qty,
+            'product_uom': self.product_uom.id or False,
+            'product_uom_category_id': self.product_uom_category_id.id or False,
+            'product_uom_txt': self.product_uom_txt or 'SET',
+            'price_unit': self.price_unit,
+            'item_type': self.item_type,
+            'start_date': self.start_date or False,
+            'end_date': self.end_date or False,
+            'duration': self.duration,
+            'duration_unit': self.duration_unit,
+            'ro_line_id': self.id,
+        }
+        if self.item_type == 'set' and self.component_line_ids:
+            vals['component_line_ids'] = [
+                (0, 0, {
+                    'product_id': c.product_id.id,
+                    'name': c.name or '',
+                    'price_unit': c.price_unit,
+                    'product_uom_qty': c.product_uom_qty,
+                    'product_uom': c.product_uom.id,
+                }) for c in self.component_line_ids
+            ]
+        return vals
+
+    # -------------------------------------------------------------------------
+    # ACTIONS
+    # -------------------------------------------------------------------------
+
+    def action_view_stock_forecast(self):
+        self.ensure_one()
+        if not self.product_id:
+            return False
+        wh = (self.warehouse_id.id
+              if self.warehouse_id
+              else self.env.user.company_id.warehouse_id.id)
+        action = self.env.ref(
+            'stock.stock_replenishment_product_product_action').read()[0]
         action.update({
             'name': f'Stock Forecast - {self.product_id.display_name}',
             'domain': [('product_id', '=', self.product_id.id)],
             'context': {
                 'search_default_product_id': self.product_id.id,
                 'default_product_id': self.product_id.id,
-                'default_warehouse_id': warehouse_id,
-                'search_default_warehouse_id': warehouse_id,
+                'default_warehouse_id': wh,
+                'search_default_warehouse_id': wh,
             },
         })
-
         return action
 
-    @api.onchange('item_type')
-    def onchange_item_type(self):
-        for rec in self:
-            rec.product_id = False
-            rec.product_uom_txt = 'SET'
-
-    @api.onchange('product_id')
-    def product_id_change(self):
-        self._update_description()
-        self._update_taxes()
-
-    @api.onchange('duration_unit', 'duration')
-    def onchange_duration(self):
-        self._update_taxes()
-    
-    def _update_description(self):
-        if not self.product_id:
-            self.name = False
-        lang = get_lang(self.env, self.order_id.partner_id.lang).code
-        product = self.product_id.with_context(
-            lang=lang,
-        )
-
-        self.update({'name': product.display_name})
-
-    def _update_taxes(self):
-        vals = {}
-        if not self.product_id:
-            vals['product_uom'] = False
-            vals['product_uom_qty'] = 1.0
-            vals['price_unit'] = 0.0
-            vals['product_uom_txt'] = "SET"
-            self.update(vals)
-            return
-        
-        if not self.product_uom or (self.product_id.uom_id.id != self.product_uom.id):
-            vals['product_uom'] = self.product_id.uom_id
-            vals['product_uom_qty'] = self.product_uom_qty or 1.0
-            vals['product_uom_txt'] = self.product_id.uom_id.name
-
-        product = self.product_id.with_context(
-            partner=self.order_id.partner_id,
-            quantity=vals.get('product_uom_qty') or self.product_uom_qty,
-            date=self.order_id.date_order,
-            pricelist=self.order_id.pricelist_id.id,
-            uom=self.product_uom.id
-        )
-
-        if self.order_id.pricelist_id and self.order_id.partner_id:
-            rental_pricing_list = self._get_rental_pricing_list(product)
-            if not rental_pricing_list:
-                raise ValidationError(
-                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.duration_unit)
-                )
-            rental_pricing_keys = rental_pricing_list.keys()
-            if self.duration_unit not in rental_pricing_keys:
-                readable_units = ", ".join(rental_pricing_keys)
-                raise ValidationError(
-                    f"This product is not available for rental by {self.duration_unit}. "
-                    f"Please choose from the available options: {readable_units}."
-                )
-
-            rental_price = rental_pricing_list[self.duration_unit] * self.duration
-            vals['price_unit'] = product._get_tax_included_unit_price(
-                self.company_id,
-                self.order_id.currency_id,
-                self.order_id.date_order,
-                'sale',
-                fiscal_position=self.order_id.fiscal_position_id,
-                product_price_unit=rental_price,
-                product_currency=self.order_id.currency_id
-            )
-
-        self.update(vals)
-
-    def _get_rental_pricing_list(self, product):
-        if not product or not product.rental_pricing_ids:
-            return False
-        
-        return {price.unit: price.price for price in product.rental_pricing_ids}
-    
-    @api.onchange('component_line_ids')
-    def onchange_component_line_ids(self):
-        for rec in self:
-            total_price_unit = 0.0
-            for comp in rec.component_line_ids:
-                total_price_unit += comp.price_subtotal
-            rec.update({
-                'price_unit': total_price_unit
-            })
-
-    def check_rental_period(self):
-        for rec in self:
-            if not rec.start_date:
-                raise ValidationError(_(f"Rental period start date for item code {rec.item_code} is not defined. Please define it before starting the rental."))
-            if not rec.end_date:
-                raise ValidationError(_(f"Rental period end date for item code {rec.item_code} is not defined. Please define it before starting the rental."))
-
-    def _get_contract_line_vals(self):
-        for rec in self:
-            contract_line_vals =  {
-                'name': rec.name or '',
-                'item_code': rec.item_code or '',
-                'sequence': rec.sequence or '',
-                'product_id': rec.product_id.id or False,
-                'product_template_id': rec.product_template_id.id or False,
-                'product_uom_qty': rec.product_uom_qty or 1.0,
-                'product_uom': rec.product_uom.id or False,
-                'product_uom_category_id': rec.product_uom_category_id.id or False,
-                'product_uom_txt': rec.product_uom_txt or 'SET',
-                'price_unit': rec.price_unit or 0.0,
-                'item_type': rec.item_type,
-                'start_date': rec.start_date or False,
-                'end_date': rec.end_date or False,
-                'duration': rec.duration or False,
-                'duration_unit': rec.duration_unit or False,
-                'ro_line_id': rec.id or False
-            }
-            if rec.item_type == 'set':
-                component_line_ids = []
-                for comp in rec.component_line_ids:
-                    component_line_ids.append((
-                        0, 0, {
-                            'product_id': comp.product_id.id or False,
-                            'name': comp.name or False,
-                            'price_unit': comp.price_unit or 0.0,
-                            'product_uom_qty': comp.product_uom_qty or 0.0,
-                            'product_uom': comp.product_uom.id
-                        }
-                    ))
-                contract_line_vals.update({'component_line_ids': component_line_ids})
-
-            return contract_line_vals
-        
     def action_item_hireoff(self):
+        self.ensure_one()
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'rental.item.hireoff.wizard',
             'view_mode': 'form',
-            'view_id': self.env.ref('gdi_rental.view_rental_item_hireoff_wizard_form').id,
+            'view_id': self.env.ref(
+                'gdi_rental.view_rental_item_hireoff_wizard_form').id,
             'target': 'new',
-            'context': {
-                'default_rental_orderline_id': self.id,
-            }
+            'context': {'default_rental_orderline_id': self.id},
         }

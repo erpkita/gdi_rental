@@ -1,350 +1,454 @@
 # -*- coding: utf-8 -*-
+
 import json
 import logging
 from datetime import datetime, timedelta
 
-from odoo import models, fields, api, _
+from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 from dateutil.relativedelta import relativedelta
 
 _logger = logging.getLogger(__name__)
 
+
 class GdiRentalOrder(models.Model):
-    _name = "gdi.rental.order"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
-    _description = "GDI Rental Order"
-    _order = 'date_order, id desc'
+    _name = 'gdi.rental.order'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _description = 'GDI Rental Order'
+    _order = 'date_order desc, id desc'
 
-    @api.depends('order_line.price_total')
-    def _amount_all(self):
-        """
-        Compute the total amounts of the RQ.
-        """
-        for order in self:
-            amount_untaxed = amount_tax = 0.0
-            for line in order.order_line:
-                amount_untaxed += line.price_subtotal
-                amount_tax += line.price_tax
-            order.update({
-                'amount_untaxed': amount_untaxed,
-                'amount_tax': amount_tax,
-                'amount_total': amount_untaxed + amount_tax,
-            })
+    # -------------------------------------------------------------------------
+    # FIELDS
+    # -------------------------------------------------------------------------
 
-    name = fields.Char(string="RO Reference", 
-                       require=True, copy=False, readonly=True, index=True, 
-                       default=lambda self: _('New'))
-    customer_reference = fields.Char(string="Customer Reference", copy=False)
-    customer_po_number = fields.Char(string="Customer Ref. PO", copy=False)
-    date_order = fields.Datetime(string='Order Date', 
-                                 required=True, readonly=True, index=True, 
-                                 states={'confirm': [('readonly', False)]}, 
-                                 copy=False, 
-                                 default=fields.Datetime.now, 
-                                 help="Creation date of rental order")
-    is_expired = fields.Boolean(compute='_compute_is_expired', string="Is expired")
-    create_date = fields.Datetime(string='Creation Date', 
-                                  readonly=True, index=True, 
-                                  help="Date on which rental order is created.")
-    user_id = fields.Many2one(
-        'res.users', string='Salesperson', index=True, tracking=2, default=lambda self: self.env.user,
-        domain=lambda self: "[('groups_id', '=', {}), ('share', '=', False), ('company_ids', '=', company_id)]".format(
-            self.env.ref("sales_team.group_sale_salesman").id
-        ),)
-    fiscal_position_id = fields.Many2one(
-        'account.fiscal.position', string='Fiscal Position',
-        domain="[('company_id', '=', company_id)]", check_company=True,
-        help="Fiscal positions are used to adapt taxes and accounts for particular customers or sales orders/invoices."
-        "The default value comes from the customer.")
-    tax_country_id = fields.Many2one(
-        comodel_name='res.country',
-        compute='_compute_tax_country_id',
-        # Avoid access error on fiscal position when reading a sale order with company != user.company_ids
-        compute_sudo=True,
-        help="Technical field to filter the available taxes depending on the fiscal country and fiscal position.")
-    company_id = fields.Many2one('res.company', 'Company', required=True, index=True, default=lambda self: self.env.company)
-
-    partner_id = fields.Many2one(
-        'res.partner', string='Customer', readonly=True,
-        states={'confirm': [('readonly', False)]},
-        required=True, change_default=True, index=True, tracking=1,
-        domain="[('type', '!=', 'private'), ('company_id', 'in', (False, company_id))]",)
-    partner_invoice_id = fields.Many2one(
-        'res.partner', string='Invoice Address',
-        readonly=True, required=True,
-        states={'confirm': [('readonly', False)]},
-        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",)
-    partner_shipping_id = fields.Many2one(
-        'res.partner', string='Delivery Address', readonly=True, required=True,
-        states={'confirm': [('readonly', False)]},
-        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",)
-    
-    pricelist_id = fields.Many2one(
-        'product.pricelist', string='Pricelist', check_company=True,  # Unrequired company
-        required=True, readonly=True, states={'confirm': [('readonly', False)]},
-        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", tracking=1,
-        help="If you change the pricelist, only newly added lines will be affected.")
-    currency_id = fields.Many2one(related='pricelist_id.currency_id', depends=["pricelist_id"], store=True, ondelete="restrict")
-
-    order_line = fields.One2many('gdi.rental.order.line', 'order_id', 
-                                 string="Order Lines",
-                                  states={'cancel': [('readonly', True)], 'hireoff': [('readonly', True)]}, 
-                                  copy=True, auto_join=True)
-
-    amount_untaxed = fields.Monetary(string='Untaxed Amount', store=True, compute='_amount_all', tracking=5)
-    tax_totals_json = fields.Char(compute='_compute_tax_totals_json')
-    amount_tax = fields.Monetary(string='Taxes', store=True, compute='_amount_all')
-    amount_total = fields.Monetary(string='Total', store=True, compute='_amount_all', tracking=4)
-    currency_rate = fields.Float("Currency Rate", 
-                                 compute='_compute_currency_rate', store=True, 
-                                 digits=(12, 6), 
-                                 help='The rate of the currency to the currency of rate 1 applicable at the date of the order')
-    note = fields.Html('Terms and conditions')
+    name = fields.Char(
+        string='RO Reference', required=True, copy=False,
+        readonly=True, index=True, default=lambda self: _('New'))
     state = fields.Selection([
         ('confirm', 'Confirmed'),
         ('ongoing', 'Ongoing'),
         ('hireoff', 'Hired-off'),
-        ('cancel', 'Cancelled')
-    ], default='confirm')
+        ('cancel', 'Cancelled'),
+    ], string='Status', default='confirm', tracking=True)
 
-    quotation_id = fields.Many2one("rental.quotation", string="Quotation", readonly=True)
+    # --- Partner ---
+    partner_id = fields.Many2one(
+        'res.partner', string='Customer', required=True, readonly=True,
+        states={'confirm': [('readonly', False)]},
+        change_default=True, index=True, tracking=1,
+        domain="[('type', '!=', 'private'), ('company_id', 'in', (False, company_id))]")
+    partner_invoice_id = fields.Many2one(
+        'res.partner', string='Invoice Address', required=True, readonly=True,
+        states={'confirm': [('readonly', False)]},
+        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
+    partner_shipping_id = fields.Many2one(
+        'res.partner', string='Delivery Address', required=True, readonly=True,
+        states={'confirm': [('readonly', False)]},
+        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
 
-    date_definition_level = fields.Selection([
-        ('order', 'Rental Order Level'),
-        ('item', 'Rental Order Item Level')
-    ], string="Date Definition Level", default='order', required=True,
-       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level.")
+    customer_reference = fields.Char(string='Customer Reference', copy=False)
+    customer_po_number = fields.Char(string='Customer Ref. PO', copy=False)
 
-    start_date = fields.Date(string="Start Date", default=fields.Date.today, required=True)
-    end_date = fields.Date(string="Initial End Date", compute="_compute_end_date", store=True)
-    hireoff_date = fields.Date(string="Hire-off Date", readonly=True)
+    # --- Dates & Duration ---
+    date_order = fields.Datetime(
+        string='Order Date', required=True, readonly=True, index=True,
+        copy=False, default=fields.Datetime.now,
+        states={'confirm': [('readonly', False)]})
+    create_date = fields.Datetime(
+        string='Creation Date', readonly=True, index=True)
+    start_date = fields.Date(
+        string='Start Date', default=fields.Date.today, required=True)
+    end_date = fields.Date(
+        string='Initial End Date', compute='_compute_end_date', store=True)
+    hireoff_date = fields.Date(string='Hire-off Date', readonly=True)
+    effective_end_date = fields.Date(string='Effective End Date')
 
-    duration = fields.Integer(string="Duration", default=1, required=True, compute="_compute_duration_from_lines", inverse="_inverse_duration", store=True)
+    duration = fields.Integer(
+        string='Duration', default=1, required=True,
+        compute='_compute_duration_from_lines',
+        inverse='_inverse_duration', store=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
-        ('month', 'Months')
-    ], string="Unit", required=True,
-    compute="_compute_duration_from_lines",
-    inverse="_inverse_duration",
-    store=True
-    )
+        ('week', 'Weeks'),
+        ('month', 'Months'),
+    ], string='Unit', required=True, default='month',
+        compute='_compute_duration_from_lines',
+        inverse='_inverse_duration', store=True)
+    duration_string = fields.Char(
+        string='Duration Str', compute='_compute_duration_str')
 
-    duration_string = fields.Char(string="Duration Str", compute="_compute_duration_str")
+    date_definition_level = fields.Selection([
+        ('order', 'Rental Order Level'),
+        ('item', 'Rental Order Item Level'),
+    ], string='Date Definition Level', default='order', required=True)
 
-    effective_end_date = fields.Date(string="Effective End Date")
-    contract_id = fields.Many2one("rental.contract", string="Active Contract")
-    rental_contract_ids = fields.One2many("rental.contract", "order_id", string="Contracts Documents")
-    rental_picking_ids = fields.One2many("stock.picking", "gdi_rental_id", string="RDO Documents")
+    # --- Company / Currency ---
+    company_id = fields.Many2one(
+        'res.company', string='Company', required=True, index=True,
+        default=lambda self: self.env.company)
+    pricelist_id = fields.Many2one(
+        'product.pricelist', string='Pricelist', required=True,
+        check_company=True, readonly=True,
+        states={'confirm': [('readonly', False)]},
+        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        tracking=1)
+    currency_id = fields.Many2one(
+        related='pricelist_id.currency_id',
+        depends=['pricelist_id'], store=True, ondelete='restrict')
+    fiscal_position_id = fields.Many2one(
+        'account.fiscal.position', string='Fiscal Position',
+        domain="[('company_id', '=', company_id)]", check_company=True)
+    tax_country_id = fields.Many2one(
+        'res.country', compute='_compute_tax_country_id',
+        compute_sudo=True)
 
+    # --- Salesperson ---
+    user_id = fields.Many2one(
+        'res.users', string='Salesperson', index=True, tracking=2,
+        default=lambda self: self.env.user,
+        domain=lambda self: (
+            "[('groups_id', '=', %s), ('share', '=', False), "
+            "('company_ids', '=', company_id)]"
+            % self.env.ref('sales_team.group_sale_salesman').id))
+    is_expired = fields.Boolean(
+        compute='_compute_is_expired', string='Is expired')
+
+    # --- Lines ---
+    order_line = fields.One2many(
+        'gdi.rental.order.line', 'order_id', string='Order Lines',
+        states={'cancel': [('readonly', True)], 'hireoff': [('readonly', True)]},
+        copy=True, auto_join=True)
+
+    # --- Totals ---
+    amount_untaxed = fields.Monetary(
+        string='Untaxed Amount', store=True, compute='_compute_amounts', tracking=5)
+    amount_tax = fields.Monetary(
+        string='Taxes', store=True, compute='_compute_amounts')
+    amount_total = fields.Monetary(
+        string='Total', store=True, compute='_compute_amounts', tracking=4)
+    tax_totals_json = fields.Char(compute='_compute_tax_totals_json')
+    currency_rate = fields.Float(
+        string='Currency Rate', compute='_compute_currency_rate',
+        store=True, digits=(12, 6))
+
+    # --- Links ---
+    quotation_id = fields.Many2one(
+        'rental.quotation', string='Quotation', readonly=True)
+    contract_id = fields.Many2one(
+        'rental.contract', string='Active Contract')
+    rental_contract_ids = fields.One2many(
+        'rental.contract', 'order_id', string='Contract Documents')
+    rental_picking_ids = fields.One2many(
+        'stock.picking', 'gdi_rental_id', string='RDO Documents')
+
+    # --- Warehouse ---
     warehouse_id = fields.Many2one(
-        'stock.warehouse',
-        string='Warehouse',
-        required=True,
+        'stock.warehouse', string='Warehouse', required=True,
         check_company=True,
-        default=lambda self: self.env['stock.warehouse'].search([
-            ('company_id', '=', self.env.company.id)
-        ], limit=1)
-    )
+        default=lambda self: self.env['stock.warehouse'].search(
+            [('company_id', '=', self.env.company.id)], limit=1))
 
-    @api.depends('duration', 'duration_unit')
-    def _compute_duration_str(self):
-        for record in self:
-            record.duration_string = f"{record.duration} {dict(self._fields['duration_unit'].selection).get(record.duration_unit, 'Not Defined')}"
+    # --- Misc ---
+    note = fields.Html('Terms and conditions')
+
+    # -------------------------------------------------------------------------
+    # COMPUTE METHODS
+    # -------------------------------------------------------------------------
+
+    @api.depends('order_line.price_total')
+    def _compute_amounts(self):
+        for order in self:
+            untaxed = tax = 0.0
+            for line in order.order_line:
+                untaxed += line.price_subtotal
+                tax += line.price_tax
+            order.amount_untaxed = untaxed
+            order.amount_tax = tax
+            order.amount_total = untaxed + tax
 
     @api.depends('start_date', 'duration', 'duration_unit')
     def _compute_end_date(self):
-        for record in self:
-            if not record.start_date:
-                record.end_date = False
+        delta_map = {
+            'hour': lambda d: relativedelta(hours=d),
+            'day': lambda d: relativedelta(days=d),
+            'week': lambda d: relativedelta(weeks=d),
+            'month': lambda d: relativedelta(months=d),
+        }
+        for rec in self:
+            if not rec.start_date or not rec.duration_unit:
+                rec.end_date = False
                 continue
-                
-            if record.duration_unit == 'hour':
-                # For hours, we need to handle it differently as Date fields don't have hours
-                # This is a simplified approach - you might need to convert to datetime if precision is critical
-                record.end_date = record.start_date + relativedelta(hours=record.duration)
-            elif record.duration_unit == 'day':
-                record.end_date = record.start_date + relativedelta(days=record.duration)
-            elif record.duration_unit == 'week':
-                record.end_date = record.start_date + relativedelta(weeks=record.duration)
-            elif record.duration_unit == 'month':
-                record.end_date = record.start_date + relativedelta(months=record.duration)
+            delta_fn = delta_map.get(rec.duration_unit)
+            rec.end_date = rec.start_date + delta_fn(rec.duration) if delta_fn else False
 
-    @api.model
-    def _convert_to_days(self, duration, duration_unit):
-        """Convert any duration unit to approximate days for comparison"""
-        if duration_unit == 'hour':
-            return duration / 24
-        elif duration_unit == 'day':
-            return duration
-        elif duration_unit == 'week':
-            return duration * 7
-        elif duration_unit == 'month':
-            return duration * 30  # Approximation
-        return 0
-    
-    # @api.onchange('duration', 'duration_unit')
-    # def _onchange_header_duration(self):
-    #     """Update all line durations when header duration changes"""
-    #     if self.order_line:
-    #         for line in self.order_line:
-    #             line.duration = self.duration
-    #             line.duration_unit = self.duration_unit
-
-    @api.depends("order_line", "order_line.duration", "order_line.duration_unit")
+    @api.depends('order_line', 'order_line.duration', 'order_line.duration_unit')
     def _compute_duration_from_lines(self):
-        for record in self:
-            record.update_header_duration()
+        for rec in self:
+            if not rec.order_line:
+                continue
+            longest_days = 0
+            best_duration = rec.duration or 1
+            best_unit = rec.duration_unit or 'month'
+            for line in rec.order_line:
+                line_days = self._to_days(line.duration, line.duration_unit)
+                if line_days > longest_days:
+                    longest_days = line_days
+                    best_duration = line.duration
+                    best_unit = line.duration_unit
+            rec.duration = best_duration
+            rec.duration_unit = best_unit
 
     def _inverse_duration(self):
-        # Just allow the fields to be editable.
-        pass    
-    
-    def update_header_duration(self):
-        """Update header duration based on longest line item"""
-        longest_days = 0
-        longest_duration = self.duration
-        longest_unit = self.duration_unit
-        
-        for line in self.order_line:
-            line_days = self._convert_to_days(line.duration, line.duration_unit)
-            if line_days > longest_days:
-                longest_days = line_days
-                longest_duration = line.duration
-                longest_unit = line.duration_unit
-        
-        self.duration = longest_duration
-        self.duration_unit = longest_unit
+        pass  # Allow direct edits
 
+    @api.depends('duration', 'duration_unit')
+    def _compute_duration_str(self):
+        labels = dict(self._fields['duration_unit'].selection)
+        for rec in self:
+            rec.duration_string = f"{rec.duration} {labels.get(rec.duration_unit, '')}"
+
+    @api.depends('order_line.tax_id', 'order_line.price_unit',
+                 'amount_total', 'amount_untaxed')
+    def _compute_tax_totals_json(self):
+        def _compute_taxes(line):
+            price = line.price_unit * (1 - (line.discount or 0.0) / 100.0)
+            return line.tax_id._origin.compute_all(
+                price, line.order_id.currency_id,
+                line.product_uom_qty, product=line.product_id,
+                partner=line.order_id.partner_shipping_id)
+
+        AccountMove = self.env['account.move']
+        for order in self:
+            tax_data = AccountMove._prepare_tax_lines_data_for_totals_from_object(
+                order.order_line, _compute_taxes)
+            tax_totals = AccountMove._get_tax_totals(
+                order.partner_id, tax_data,
+                order.amount_total, order.amount_untaxed, order.currency_id)
+            order.tax_totals_json = json.dumps(tax_totals)
+
+    @api.depends('pricelist_id', 'date_order', 'company_id')
+    def _compute_currency_rate(self):
+        for order in self:
+            if order.company_id and order.company_id.currency_id and order.currency_id:
+                order.currency_rate = self.env['res.currency']._get_conversion_rate(
+                    order.company_id.currency_id, order.currency_id,
+                    order.company_id, order.date_order)
+            else:
+                order.currency_rate = 1.0
+
+    def _compute_tax_country_id(self):
+        for rec in self:
+            if rec.fiscal_position_id.foreign_vat:
+                rec.tax_country_id = rec.fiscal_position_id.country_id
+            else:
+                rec.tax_country_id = rec.company_id.account_fiscal_country_id
+
+    def _compute_is_expired(self):
+        today = fields.Date.today()
+        for rec in self:
+            rec.is_expired = bool(rec.end_date and rec.end_date < today)
+
+    # -------------------------------------------------------------------------
+    # HELPERS
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _to_days(duration, unit):
+        """Convert duration to approximate days for comparison."""
+        multipliers = {'hour': 1 / 24, 'day': 1, 'week': 7, 'month': 30}
+        return duration * multipliers.get(unit, 0)
+
+    # -------------------------------------------------------------------------
+    # CRUD
+    # -------------------------------------------------------------------------
 
     @api.model
     def create(self, vals):
         if vals.get('name', _('New')) == _('New'):
             seq_date = None
             if 'date_order' in vals:
-                seq_date = fields.Datetime.context_timestamp(self, fields.Datetime.to_datetime(vals['date_order']))
-            vals['name'] = "RO" + self.env['ir.sequence'].next_by_code('gdi.rental.order', sequence_date=seq_date) or _('New')
-        result = super(GdiRentalOrder, self).create(vals)
-        return result
+                seq_date = fields.Datetime.context_timestamp(
+                    self, fields.Datetime.to_datetime(vals['date_order']))
+            seq = self.env['ir.sequence'].next_by_code(
+                'gdi.rental.order', sequence_date=seq_date) or _('New')
+            vals['name'] = f"RO{seq}"
+        return super().create(vals)
+
+    # -------------------------------------------------------------------------
+    # ONCHANGES
+    # -------------------------------------------------------------------------
 
     @api.onchange('partner_id')
-    def onchange_partner_id(self):
-        """
-        Update the following fields when the partner is changed:
-        - Pricelist
-        - Payment terms
-        - Invoice address
-        - Delivery address
-        - Sales Team
-        """
+    def _onchange_partner_id(self):
         if not self.partner_id:
-            self.update({
-                'partner_invoice_id': False,
-                'partner_shipping_id': False,
-                'fiscal_position_id': False,
-            })
+            self.partner_invoice_id = False
+            self.partner_shipping_id = False
+            self.fiscal_position_id = False
             return
 
         self = self.with_company(self.company_id)
-
         addr = self.partner_id.address_get(['delivery', 'invoice'])
-        partner_user = self.partner_id.user_id or self.partner_id.commercial_partner_id.user_id
-        values = {
-            'pricelist_id': self.partner_id.property_product_pricelist and self.partner_id.property_product_pricelist.id or False,
-            'partner_invoice_id': addr['invoice'],
-            'partner_shipping_id': addr['delivery'],
+        self.partner_invoice_id = addr['invoice']
+        self.partner_shipping_id = addr['delivery']
+        self.pricelist_id = (
+            self.partner_id.property_product_pricelist.id
+            if self.partner_id.property_product_pricelist else False)
+
+        partner_user = (
+            self.partner_id.user_id
+            or self.partner_id.commercial_partner_id.user_id)
+        if partner_user and not self.env.context.get('not_self_saleperson'):
+            self.user_id = partner_user
+
+    # -------------------------------------------------------------------------
+    # ACTIONS
+    # -------------------------------------------------------------------------
+
+    def action_cancel(self):
+        self.write({'state': 'cancel'})
+
+    def action_print_order(self):
+        pass
+
+    def action_create_contract(self):
+        """Open the contract creation wizard."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'rental.contract.creation.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref(
+                'gdi_rental.gdi_rental_contract_creation_wizard_form_view').id,
+            'target': 'new',
+            'context': {'default_rental_id': self.id},
         }
-        user_id = partner_user.id
-        if not self.env.context.get('not_self_saleperson'):
-            user_id = user_id or self.env.context.get('default_user_id', self.env.uid)
-        if user_id and self.user_id.id != user_id:
-            values['user_id'] = user_id
-
-        self.update(values)
-
-    @api.depends('order_line.tax_id', 'order_line.price_unit', 'amount_total', 'amount_untaxed')
-    def _compute_tax_totals_json(self):
-        def compute_taxes(order_line):
-            price = order_line.price_unit * (1 - (order_line.discount or 0.0) / 100.0)
-            order = order_line.order_id
-            return order_line.tax_id._origin.compute_all(price, order.currency_id, order_line.product_uom_qty, product=order_line.product_id, partner=order.partner_shipping_id)
-
-        account_move = self.env['account.move']
-        for order in self:
-            tax_lines_data = account_move._prepare_tax_lines_data_for_totals_from_object(order.order_line, compute_taxes)
-            tax_totals = account_move._get_tax_totals(order.partner_id, tax_lines_data, order.amount_total, order.amount_untaxed, order.currency_id)
-            order.tax_totals_json = json.dumps(tax_totals)
-
-    @api.depends('pricelist_id', 'date_order', 'company_id')
-    def _compute_currency_rate(self):
-        for order in self:
-            if not order.company_id:
-                order.currency_rate = order.currency_id.with_context(date=order.date_order).rate or 1.0
-                continue
-            elif order.company_id.currency_id and order.currency_id:  # the following crashes if any one is undefined
-                order.currency_rate = self.env['res.currency']._get_conversion_rate(order.company_id.currency_id, order.currency_id, order.company_id, order.date_order)
-            else:
-                order.currency_rate = 1.0
-    
-    def _order_check_rental_period(self):
-        for rec in self:
-            if not rec.start_date:
-                raise ValidationError(_(f"Rental period start date is not defined. Please define it before starting the rental."))
-            if not rec.end_date:
-                raise ValidationError(_(f"Rental period end date is not defined. Please define it before starting the rental."))            
-
-    def action_view_rental_contract(self, contract_id):
-        action = self.env['ir.actions.actions']._for_xml_id("gdi_rental.action_gdi_rental_contracts_view")
-        form_view = [(self.env.ref('gdi_rental.view_gdi_rental_contract_tree_form').id, 'form')]
-        if 'views' in action:
-            action['views'] = form_view + [(state,view) for state,view in action['views'] if view != 'form']
-        else:
-            action['views'] = form_view
-        action['res_id'] = contract_id.id
-
-        return action
 
     def action_generate_contract(self):
+        """Generate contract directly from order lines."""
+        self.ensure_one()
+        contract = self.env['rental.contract'].create(
+            self._prepare_contract_vals())
+        for line in self.order_line:
+            line_vals = self._prepare_contract_line(line)
+            line_vals['contract_id'] = contract.id
+            self.env['rental.contract.line'].create(line_vals)
+        self.write({'state': 'ongoing'})
+        return contract
+
+    def action_start_rental(self):
+        """Start the rental: create contract, auto-sign, generate DO."""
         for rec in self:
-            # if rec.date_definition_level == "order":
-            #     rec._order_check_rental_period()
-            # else:
-            #     for line in rec.order_line:
-            #         line.check_rental_period()
-            
-            contract_id = self.env["rental.contract"].create(rec._prepare_contract_vals())
             for line in rec.order_line:
-                contract_line_values = self._prepare_contract_line(line)
-                contract_line_values.update({'contract_id': contract_id.id})
-                self.env["rental.contract.line"].create(contract_line_values)
-            
-            rec.write({'state': 'ongoing'}) 
-            # return rec.action_view_rental_contract(contract_id)
-            return contract_id
-    
-    def _prepare_contract_vals(self):
-        partner = self.partner_id
-        contract_vals = {
-            'partner_id': partner.id or False,
-            'pricelist_id': self.pricelist_id.id or False,
-            'customer_reference': self.customer_reference or False,
-            'customer_po_number': self.customer_po_number or False,
-            'user_id': self.user_id.id or False,
-            'order_id': self.id or False,
-            'company_id': self.company_id.id or False,
-            # 'date_definition_level': self.date_definition_level or False,
-            # 'start_date': self.start_date or False,
-            # 'end_date': self.end_date or False,
-            'currency_id': self.currency_id.id or False,
-            'contract_line_ids' : [],
-            'fiscal_position_id': self.fiscal_position_id.id
+                line.check_rental_period()
+
+            contract_vals = rec._prepare_rental_contract_vals()
+            contract_vals['contract_line_ids'] = [
+                (0, 0, line._get_contract_line_vals())
+                for line in rec.order_line
+            ]
+            contract = self.env['rental.contract'].create(contract_vals)
+            if not contract:
+                raise ValidationError(
+                    _("Error creating contract. Please contact administrator!"))
+
+            # Auto-sign and generate DO
+            contract.with_context(new_rdo=True).create_do()
+
+            rec.write({
+                'state': 'ongoing',
+                'effective_end_date': rec.end_date,
+                'contract_id': contract.id,
+            })
+
+    def action_hireoff(self):
+        """Process hire-off: return all active rental items."""
+        for rec in self:
+            active_lines = rec.order_line.filtered(
+                lambda l: l.rental_state == 'active')
+            if not active_lines:
+                raise ValidationError(
+                    _("No active rental items found to hire-off."))
+
+            picking_type = self.env['stock.picking.type'].search(
+                [('name', '=', 'Rental Physical Inventory')], limit=1)
+            if not picking_type:
+                raise ValidationError(
+                    _("Operation type 'Rental Physical Inventory' not found. "
+                      "Please contact your system administrator!"))
+
+            try:
+                picking = rec._create_hireoff_picking(picking_type)
+                rec.write({
+                    'state': 'hireoff',
+                    'hireoff_date': fields.Datetime.now(),
+                })
+                active_lines.write({'rental_state': 'hireoff'})
+                rec.message_post(
+                    body=_("Rental order hired-off. Physical inventory: %s")
+                    % picking.name)
+            except Exception as e:
+                _logger.error("Hire-off failed for %s: %s", rec.name, e)
+                raise ValidationError(
+                    _("Failed to process hire-off. Error: %s") % str(e))
+
+    def action_view_rental_contract(self, contract_id):
+        action = self.env['ir.actions.actions']._for_xml_id(
+            'gdi_rental.action_gdi_rental_contracts_view')
+        form_view = [(
+            self.env.ref('gdi_rental.view_gdi_rental_contract_tree_form').id,
+            'form')]
+        action['views'] = form_view + [
+            (s, v) for s, v in action.get('views', []) if v != 'form']
+        action['res_id'] = contract_id.id
+        return action
+
+    def open_related_contract(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_id': self.contract_id.id or False,
+            'res_model': 'rental.contract',
+            'view_mode': 'form',
         }
 
-        return contract_vals
+    # -------------------------------------------------------------------------
+    # CONTRACT PREPARATION
+    # -------------------------------------------------------------------------
+
+    def _prepare_contract_vals(self):
+        self.ensure_one()
+        return {
+            'partner_id': self.partner_id.id,
+            'pricelist_id': self.pricelist_id.id,
+            'customer_reference': self.customer_reference or False,
+            'customer_po_number': self.customer_po_number or False,
+            'user_id': self.user_id.id,
+            'order_id': self.id,
+            'company_id': self.company_id.id,
+            'currency_id': self.currency_id.id,
+            'fiscal_position_id': self.fiscal_position_id.id,
+            'contract_line_ids': [],
+        }
+
+    def _prepare_rental_contract_vals(self):
+        """Prepare contract vals including rental period info."""
+        self.ensure_one()
+        return {
+            'order_id': self.id,
+            'partner_id': self.partner_id.id,
+            'customer_reference': self.customer_reference or '',
+            'customer_po_number': self.customer_po_number or '',
+            'duration': self.duration or 1,
+            'duration_unit': self.duration_unit or 'month',
+            'start_date': self.start_date or False,
+            'end_date': self.end_date or False,
+            'pricelist_id': self.pricelist_id.id,
+            'fiscal_position_id': self.fiscal_position_id.id,
+        }
 
     def _prepare_contract_line(self, line):
-        contract_line_vals = {
+        vals = {
             'ro_line_id': line.id,
             'name': line.name,
             'item_type': line.item_type,
@@ -352,502 +456,147 @@ class GdiRentalOrder(models.Model):
             'product_id': line.product_id.id or False,
             'product_uom': line.product_uom.id or False,
             'product_uom_qty': line.product_uom_qty,
-            'product_uom_txt': line.product_uom_txt or "",
+            'product_uom_txt': line.product_uom_txt or '',
             'price_unit': line.price_unit,
-            'tax_id' : line.tax_id.ids or False,
+            'tax_id': line.tax_id.ids or False,
             'duration': line.duration,
-            # 'date_definition_level': line.date_definition_level or False,
-            # 'start_date': line.start_date or False,
-            # 'end_date': line.end_date or False,
-            'duration_unit': line.duration_unit
+            'duration_unit': line.duration_unit,
         }
-        if line.item_type == 'set':
-            component_records = []
-            for rec in line.component_line_ids:
-                component_records.append((0, 0, {
-                    'product_id': rec.product_id.id or False,
-                    'name': rec.name or False,
-                    'price_unit': rec.price_unit or 0.0,
-                    'product_uom_qty': rec.product_uom_qty or 0.0,
-                    'product_uom': rec.product_uom.id
-                }))
+        if line.item_type == 'set' and line.component_line_ids:
+            vals['component_line_ids'] = [
+                (0, 0, {
+                    'product_id': c.product_id.id,
+                    'name': c.name or '',
+                    'price_unit': c.price_unit,
+                    'product_uom_qty': c.product_uom_qty,
+                    'product_uom': c.product_uom.id,
+                }) for c in line.component_line_ids
+            ]
+        return vals
 
-            contract_line_vals.update({'component_line_ids': component_records})
-        return contract_line_vals
-                
-    def action_create_contract(self): 
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'rental.contract.creation.wizard',
-            'view_mode': 'form',
-            'view_id': self.env.ref('gdi_rental.gdi_rental_contract_creation_wizard_form_view').id,
-            'target': 'new',
-            'context': {
-                'default_rental_id': self.id,
-            }
-        }
+    # -------------------------------------------------------------------------
+    # HIRE-OFF: STOCK PICKING CREATION
+    # -------------------------------------------------------------------------
 
-    def action_cancel(self):
-        pass
+    def _create_hireoff_picking(self, picking_type):
+        """Create physical inventory picking for hire-off."""
+        self.ensure_one()
+        move_lines = self._build_hireoff_moves(picking_type)
+        if not move_lines:
+            raise UserError(_("No stock moves could be created for hire-off."))
 
-    def action_print_order(self):
-        pass
-
-    def _prepare_rental_contract_vals(self, order):
-        if not order:
-            raise ValidationError(_("Could not process rental order. Please contact administrator !"))
-        return {
-            'order_id': order.id or False,
-            'partner_id': order.partner_id.id or False,
-            'customer_reference': order.customer_reference or '',
-            'customer_po_number': order.customer_po_number or '',
-            'duration': order.duration or 1,
-            'duration_unit': order.duration_unit or 'month',
-            'start_date': order.start_date or False,
-            'end_date': order.end_date or False,
-            'pricelist_id': order.pricelist_id.id or False,
-            'fiscal_position_id': order.fiscal_position_id.id or False,
-        }
-    
-    def action_start_rental(self):
-        for rec in self:
-            contract_vals = rec._prepare_rental_contract_vals(rec)
-            contract_line_ids = []
-            for line in rec.order_line:
-                line.check_rental_period()
-                contract_line_ids.append((
-                    0, 
-                    0, 
-                    line._get_contract_line_vals()
-                ))
-            contract_vals.update({'contract_line_ids': contract_line_ids})
-            contract_id = self.env['rental.contract'].create(contract_vals)
-
-            if not contract_id:
-                raise ValidationError(_("Error while creating contract. Please contact administrator !"))
-            
-            # auto sign the contract because its first rental and we expect to auto generate DO.
-            contract_id.with_context({'new_rdo': True}).create_do()
-
-            rec.write({
-                'state': 'ongoing', 
-                'effective_end_date': rec.end_date,
-                'contract_id': contract_id.id
-            })
-
-    def action_hireoff(self):
-        """
-        Process hire-off for the entire rental order.
-        Creates physical inventory to return all active rental items.
-        """
-        for rec in self:
-            # Validate there are active lines to hire-off
-            active_lines = rec.order_line.filtered(lambda x: x.rental_state == 'active')
-            if not active_lines:
-                raise ValidationError(_("No active rental items found to hire-off."))
-            
-            # Find the rental physical inventory picking type
-            picking_type_id = self.env["stock.picking.type"].search(
-                [('name', '=', 'Rental Physical Inventory')], 
-                limit=1
-            )
-            if not picking_type_id:
-                raise ValidationError(
-                    _("Operation type 'Rental Physical Inventory' not found. "
-                    "Please contact your system administrator!")
-                )
-            
-            try:
-                # Create physical inventory for hire-off
-                physical_inventory_hireoff = rec._create_physical_inventory_hireoff(picking_type_id)
-                
-                # Update rental order state
-                rec.write({
-                    'state': 'hireoff',
-                    'hireoff_date': fields.Datetime.now(),
-                })
-                
-                # Update all active lines to hireoff state
-                active_lines.write({
-                    'rental_state': 'hireoff'
-                })
-                
-                # Log the hire-off action
-                rec.message_post(
-                    body=_("Rental order hired-off. Physical inventory created: %s") % 
-                        physical_inventory_hireoff.name
-                )
-                
-            except Exception as e:
-                _logger.error(f"Failed to process hire-off for order {rec.name}: {str(e)}")
-                raise ValidationError(
-                    _("Failed to process hire-off. Error: %s") % str(e)
-                )
-
-
-    def _create_physical_inventory_hireoff(self, picking_type_id):
-        """
-        Create physical inventory transfer for hire-off of active rental items.
-        
-        Args:
-            picking_type_id: stock.picking.type record for the hire-off operation
-            
-        Returns:
-            stock.picking: Created picking record
-            
-        Raises:
-            UserError: when picking creation or validation fails.
-        """
-        if not self or not self.order_line:
-            return self.env["stock.picking"]
-        
-        try:
-            # Build all move lines for active rental items
-            move_lines = self._create_hireoff_stock_moves(picking_type_id)
-            
-            if not move_lines:
-                raise UserError(_("No stock moves could be created for hire-off."))
-            
-            # Create picking with all moves at once
-            picking_vals = self._prepare_hireoff_picking_vals(picking_type_id, move_lines)
-            picking = self.env["stock.picking"].create(picking_vals)
-            
-            # Validate the picking
-            picking.button_validate()
-            
-            return picking
-            
-        except Exception as e:
-            _logger.error(f"Failed to create physical inventory for hire-off: {str(e)}")
-            raise UserError(
-                _("Failed to create physical inventory for hire-off. Error: %s") % str(e)
-            )
-
-
-    def _prepare_hireoff_picking_vals(self, picking_type_id, move_lines):
-        """
-        Prepare values for creating hire-off stock picking record.
-        
-        Args:
-            picking_type_id: stock.picking.type record
-            move_lines: list of move tuples to include
-            
-        Returns:
-            dict: Values for stock.picking creation
-        """
-        current_datetime = fields.Datetime.now()
-        
-        picking_vals = {
+        now = fields.Datetime.now()
+        picking = self.env['stock.picking'].create({
             'partner_id': self.partner_id.id,
             'contact_person_id': self.partner_id.id,
-            'picking_type_id': picking_type_id.id,
-            'location_id': picking_type_id.default_location_dest_id.id,
-            'location_dest_id': picking_type_id.default_location_src_id.id,
-            'move_type': "direct",
-            'scheduled_date': current_datetime,
-            'date_deadline': current_datetime,
+            'picking_type_id': picking_type.id,
+            'location_id': picking_type.default_location_dest_id.id,
+            'location_dest_id': picking_type.default_location_src_id.id,
+            'move_type': 'direct',
+            'scheduled_date': now,
+            'date_deadline': now,
             'origin': f"{self.name} - Hire-off (IN)",
             'customer_po': self.customer_po_number,
             'src_user_id': self.env.user.id,
             'move_ids_without_package': move_lines,
             'rental_id': self.id,
-        }
-        
-        return picking_vals
+        })
+        picking.button_validate()
+        return picking
 
+    def _build_hireoff_moves(self, picking_type):
+        """Build stock move data for all active lines."""
+        now = fields.Datetime.now()
+        moves = []
+        seq = 0
 
-    def _create_hireoff_stock_moves(self, picking_type_id):
-        """
-        Create stock move data for hire-off items.
-        Only processes lines with rental_state = 'active'.
-        Handles both regular items and set items with components.
-        
-        Args:
-            picking_type_id: stock.picking.type record
-            
-        Returns:
-            list: List of tuples for creating stock moves
-        """
-        current_datetime = fields.Datetime.now()
-        move_lines = []
-        sq_no = 0
-        
-        # Filter only active rental lines
-        active_lines = self.order_line.filtered(lambda x: x.rental_state == 'active')
-        
-        for line in active_lines:
-            sq_no += 1
-            
-            prev_picking = self._get_hireoff_previous_picking(line)
-            if not prev_picking:
-                _logger.warning(f"No previous picking found for hire-off line: {line.name}")
+        for line in self.order_line.filtered(lambda l: l.rental_state == 'active'):
+            seq += 1
+            prev_move = self._get_prev_move(line)
+            if not prev_move:
+                _logger.warning("No previous move for hire-off line: %s", line.name)
                 continue
-            
+
             if line.item_type == 'set' and line.component_line_ids:
-                # Handle set items with components
-                component_moves = self._prepare_hireoff_set_component_moves(
-                    line, picking_type_id, prev_picking,
-                    sq_no, current_datetime
-                )
-                move_lines.extend(component_moves)
+                moves.extend(self._build_set_hireoff_moves(
+                    line, picking_type, prev_move, seq, now))
             else:
-                # Handle regular unit items
-                move_data = self._prepare_hireoff_stock_move(
-                    line, picking_type_id, prev_picking,
-                    sq_no, current_datetime
-                )
-                if move_data:
-                    move_lines.append(move_data)
-        
-        return move_lines
+                move = self._build_unit_hireoff_move(
+                    line, picking_type, prev_move, seq, now)
+                if move:
+                    moves.append(move)
+        return moves
 
-
-    def _get_hireoff_previous_picking(self, line):
-        """
-        Get the previous picking/move for a hire-off line.
-        
-        Args:
-            line: rental order line record
-            
-        Returns:
-            stock.move: Previous stock move or False
-        """
+    def _get_prev_move(self, line):
+        """Get the most recent stock move for a line."""
         if not line.stock_move_ids:
             return False
-        
-        # Get the last move (most recent outgoing move)
-        moves = line.stock_move_ids.sorted(key=lambda m: m.date, reverse=True)
-        return moves[0] if moves else False
+        return line.stock_move_ids.sorted(
+            key=lambda m: m.date, reverse=True)[:1]
 
-
-    def _prepare_hireoff_set_component_moves(self, line, picking_type_id,
-                                            prev_picking, sequence, current_datetime):
-        """
-        Prepare hire-off move data for all components in a set.
-        
-        Args:
-            line: rental order line record (set item)
-            picking_type_id: stock.picking.type record
-            prev_picking: previous stock.move record
-            sequence: base sequence number for the set
-            current_datetime: current datetime
-            
-        Returns:
-            list: List of tuples for creating component moves
-        """
-        component_moves = []
-        component_seq = 0
-        
-        for component in line.component_line_ids:
-            component_seq += 1
-            
-            prev_component_move = self._find_hireoff_component_previous_move(
-                component, prev_picking
-            )
-            
-            if not prev_component_move:
-                _logger.warning(
-                    f"No previous move found for component {component.product_id.name} "
-                    f"in set {line.name}"
-                )
-                continue
-            
-            move_data = self._prepare_hireoff_component_move(
-                line, component, picking_type_id,
-                prev_component_move, sequence, component_seq, current_datetime
-            )
-            
-            if move_data:
-                component_moves.append(move_data)
-        
-        return component_moves
-
-
-    def _find_hireoff_component_previous_move(self, component, prev_picking):
-        """
-        Find the previous stock move for a specific component.
-        
-        Args:
-            component: component line record
-            prev_picking: previous stock.move or stock.picking record
-            
-        Returns:
-            stock.move: Previous move for this component or False
-        """
-        # If prev_picking is a stock.move, get its picking
-        if prev_picking._name == 'stock.move':
-            picking = prev_picking.picking_id
-        else:
-            picking = prev_picking
-        
-        if not picking:
-            return False
-        
-        # Search for move with matching product
-        component_move = picking.move_lines.filtered(
-            lambda m: m.product_id.id == component.product_id.id
-        )
-        
-        return component_move[0] if component_move else False
-
-
-    def _prepare_hireoff_component_move(self, set_line, component,
-                                        picking_type_id, prev_component_move,
-                                        set_sequence, component_sequence, current_datetime):
-        """
-        Prepare hire-off stock move data for a single set component.
-        
-        Args:
-            set_line: rental order line record (parent set)
-            component: component line record
-            picking_type_id: stock.picking.type record
-            prev_component_move: previous stock.move for this component
-            set_sequence: sequence number of the parent set
-            component_sequence: sequence number within components
-            current_datetime: current datetime
-            
-        Returns:
-            tuple: Move data tuple (0, 0, dict) for creation
-        """
-        # Prepare move lines with lot tracking for the component
-        move_line_vals = self._prepare_hireoff_component_move_lines(
-            component, prev_component_move, picking_type_id, current_datetime
-        )
-        
-        # Use component details for the move
-        product = component.product_id
-        name = product.product_name or product.name or component.name
-        
-        # Prepare main move values
-        move_vals = {
-            'sequence_number': set_sequence + (component_sequence * 0.01),
-            'name': f"{set_line.name} - {name}",
-            'description_picking': name,
-            'product_id': product.id,
-            'product_uom': component.product_uom.id,
-            'product_uom_qty': component.product_uom_qty,
-            'date': current_datetime,
-            'location_id': picking_type_id.default_location_dest_id.id,
-            'location_dest_id': prev_component_move.location_id.id,
-            'move_line_ids': move_line_vals,
-        }
-        
-        return (0, 0, move_vals)
-
-
-    def _prepare_hireoff_component_move_lines(self, component, prev_component_move,
-                                            picking_type_id, current_datetime):
-        """
-        Prepare detailed move lines for component hire-off with lot/serial tracking.
-        
-        Args:
-            component: component line record
-            prev_component_move: previous stock.move record for this component
-            picking_type_id: stock.picking.type record
-            current_datetime: current datetime
-            
-        Returns:
-            list: List of tuples for creating stock.move.line records
-        """
-        move_lines = []
-        
-        if not prev_component_move.move_line_ids:
-            return move_lines
-        
-        for moveline in prev_component_move.move_line_ids:
-            move_line_vals = {
-                'product_id': component.product_id.id,
-                'product_uom_id': component.product_uom.id,
-                'product_uom_qty': moveline.qty_done,
-                'qty_done': moveline.qty_done,
-                'date': current_datetime,
-                'location_id': picking_type_id.default_location_dest_id.id,
-                'location_dest_id': prev_component_move.location_id.id,
-                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
-            }
-            move_lines.append((0, 0, move_line_vals))
-        
-        return move_lines
-
-
-    def _prepare_hireoff_stock_move(self, line, picking_type_id,
-                                    prev_picking, sequence, current_datetime):
-        """
-        Prepare hire-off stock move data with detailed move lines.
-        (For non-set items)
-        
-        Args:
-            line: rental order line record
-            picking_type_id: stock.picking.type record
-            prev_picking: previous stock.move record
-            sequence: sequence number for the move
-            current_datetime: current datetime
-            
-        Returns:
-            tuple: Move data tuple (0, 0, dict) for creation
-        """
-        # Prepare move lines with lot tracking
-        move_line_vals = self._prepare_hireoff_move_lines(
-            line, prev_picking, picking_type_id, current_datetime
-        )
-        
-        # Prepare main move values
-        move_vals = {
-            'sequence_number': sequence,
+    def _build_unit_hireoff_move(self, line, picking_type, prev_move, seq, now):
+        """Build hireoff move for a UNIT line."""
+        move_line_vals = self._build_hireoff_move_lines(
+            line.product_id, line.product_uom, prev_move, picking_type, now)
+        return (0, 0, {
+            'sequence_number': seq,
             'name': line.name,
             'description_picking': line.name,
             'product_id': line.product_id.id,
             'product_uom': line.product_uom.id,
             'product_uom_qty': line.product_uom_qty,
-            'date': current_datetime,
-            'location_id': picking_type_id.default_location_dest_id.id,
-            'location_dest_id': prev_picking.location_id.id,
+            'date': now,
+            'location_id': picking_type.default_location_dest_id.id,
+            'location_dest_id': prev_move.location_id.id,
             'move_line_ids': move_line_vals,
-        }
-        
-        return (0, 0, move_vals)
+        })
 
+    def _build_set_hireoff_moves(self, line, picking_type, prev_move, seq, now):
+        """Build hireoff moves for all components of a SET line."""
+        moves = []
+        picking = prev_move.picking_id if prev_move._name == 'stock.move' else prev_move
 
-    def _prepare_hireoff_move_lines(self, line, prev_picking, picking_type_id, current_datetime):
-        """
-        Prepare detailed move lines with lot/serial tracking from previous picking.
-        (For non-set items)
-        
-        Args:
-            line: rental order line record
-            prev_picking: previous stock.move record
-            picking_type_id: stock.picking.type record
-            current_datetime: current datetime
-            
-        Returns:
-            list: List of tuples for creating stock.move.line records
-        """
-        move_lines = []
-        
-        if not prev_picking.move_line_ids:
-            return move_lines
-        
-        for moveline in prev_picking.move_line_ids:
-            move_line_vals = {
-                'product_id': line.product_id.id,
-                'product_uom_id': line.product_uom.id,
-                'product_uom_qty': moveline.qty_done,
-                'qty_done': moveline.qty_done,
-                'date': current_datetime,
-                'location_id': picking_type_id.default_location_dest_id.id,
-                'location_dest_id': prev_picking.location_id.id,
-                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
-            }
-            move_lines.append((0, 0, move_line_vals))
-        
-        return move_lines
+        for comp_seq, comp in enumerate(line.component_line_ids, 1):
+            comp_prev = picking.move_lines.filtered(
+                lambda m: m.product_id.id == comp.product_id.id)[:1]
+            if not comp_prev:
+                _logger.warning(
+                    "No previous move for component %s in set %s",
+                    comp.product_id.name, line.name)
+                continue
 
+            move_line_vals = self._build_hireoff_move_lines(
+                comp.product_id, comp.product_uom, comp_prev, picking_type, now)
+            product = comp.product_id
+            name = product.product_name or product.name or comp.name
+            moves.append((0, 0, {
+                'sequence_number': seq + (comp_seq * 0.01),
+                'name': f"{line.name} - {name}",
+                'description_picking': name,
+                'product_id': product.id,
+                'product_uom': comp.product_uom.id,
+                'product_uom_qty': comp.product_uom_qty,
+                'date': now,
+                'location_id': picking_type.default_location_dest_id.id,
+                'location_dest_id': comp_prev.location_id.id,
+                'move_line_ids': move_line_vals,
+            }))
+        return moves
 
-    def open_related_contract(self):
-        for rec in self:
-            return {
-                "type": "ir.actions.act_window",
-                "res_id": rec.contract_id.id or False,
-                "res_model": "rental.contract",
-                "view_mode": "form"
-            }
+    def _build_hireoff_move_lines(self, product, uom, prev_move, picking_type, now):
+        """Build detailed move lines with lot tracking from previous move."""
+        lines = []
+        if not prev_move.move_line_ids:
+            return lines
+        for ml in prev_move.move_line_ids:
+            lines.append((0, 0, {
+                'product_id': product.id,
+                'product_uom_id': uom.id,
+                'product_uom_qty': ml.qty_done,
+                'qty_done': ml.qty_done,
+                'date': now,
+                'location_id': picking_type.default_location_dest_id.id,
+                'location_dest_id': prev_move.location_id.id,
+                'lot_id': ml.lot_id.id if ml.lot_id else False,
+            }))
+        return lines

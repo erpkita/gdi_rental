@@ -179,6 +179,7 @@
                                     <field name="end_date" string="To"/>
                                     <field
                                         name="product_uom_qty"
+                                        force_save="1"
                                         context="{
                                             'partner_id': parent.partner_id,
                                             'quantity': product_uom_qty,
@@ -278,14 +279,15 @@
                                         <group colspan="2" string="Price and Quantity">
                                             <label for="product_uom_qty"/>
                                             <div class="o_row" name="ordered_qty">
-                                                <field context="{
+                                                <field name="product_uom_qty"
+                                                    force_save="1"
+                                                    context="{
                                                     'partner_id':parent.partner_id, 
                                                     'quantity':product_uom_qty, 
                                                     'pricelist':parent.pricelist_id, 
                                                     'uom':product_uom, 
                                                     'uom_qty_change':True, 
-                                                    'company_id': parent.company_id}" 
-                                                    name="product_uom_qty"/>
+                                                    'company_id': parent.company_id}"/>
                                                 <field name="product_uom"
                                                        force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
                                                        groups="uom.group_uom" 

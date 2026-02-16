@@ -12,3 +12,7 @@ access_rental_contract_creation_wizard_all,rental.contract.creation.wizard all,m
 access_stock_rental_order_item_all,stock.rental.order.item all,model_stock_rental_order_item,,1,1,1,1
 access_rental_contract_wizard_line_all,rental.contract.wizard.line all,model_rental_contract_wizard_line,,1,1,1,1
 access_rental_item_hireoff_wizard_all,rental.item.hireoff.wizard all,model_rental_item_hireoff_wizard,,1,1,1,1
+access_gdi_rental_quotation_all,gdi.rental.quotation all,model_gdi_rental_quotation,,1,1,1,1
+access_gdi_rental_quotation_line_all,gdi.rental.quotation.line all,model_gdi_rental_quotation_line,,1,1,1,1
+access_gdi_rental_set_all,gdi.rental.set all,model_gdi_rental_set,,1,1,1,1
+access_gdi_rental_set_line_all,gdi.rental.set.line all,model_gdi_rental_set_line,,1,1,1,1

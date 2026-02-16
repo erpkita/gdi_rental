@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL QUOTATION: TREE VIEW                                    -->
+    <!-- ================================================================== -->
+
+    <record id="view_gdi_rental_quotation_tree" model="ir.ui.view">
+        <field name="name">gdi.rental.quotation.tree</field>
+        <field name="model">gdi.rental.quotation</field>
+        <field name="arch" type="xml">
+            <tree decoration-info="state in ['draft', 'sent']"
+                  decoration-success="state == 'confirm'"
+                  decoration-danger="state == 'cancel'">
+                <field name="name"/>
+                <field name="date_order"/>
+                <field name="partner_id"/>
+                <field name="customer_reference" optional="show"/>
+                <field name="customer_po_number" optional="hide"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL QUOTATION: FORM VIEW                                    -->
+    <!-- ================================================================== -->
+
+    <record id="view_gdi_rental_quotation_form" model="ir.ui.view">
+        <field name="name">gdi.rental.quotation.form</field>
+        <field name="model">gdi.rental.quotation</field>
+        <field name="arch" type="xml">
+            <form string="GDI Rental Quotation" class="o_sale_order">
+
+                <!-- ====== HEADER ====== -->
+                <header>
+                    <button name="action_send" states="draft"
+                            type="object" string="Send Quotation"
+                            class="oe_highlight"/>
+                    <button name="action_confirm" states="sent"
+                            type="object" string="Confirm"
+                            class="oe_highlight"/>
+                    <button name="action_cancel" states="draft,sent"
+                            type="object" string="Cancel"/>
+                    <button name="action_draft" states="cancel"
+                            type="object" string="Set to Draft"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sent,confirm"/>
+                </header>
+
+                <sheet>
+                    <!-- ====== TITLE ====== -->
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <!-- ====== HEADER FIELDS - IMPROVED LAYOUT ====== -->
+                    <group name="rq_header">
+                        <group name="partner_details" string="Customer Information">
+                            <field name="partner_id"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"
+                                   widget="res_partner_many2one"
+                                   context="{'res_partner_search_mode': 'customer',
+                                             'show_address': 1, 'show_vat': True}"
+                                   options='{"always_reload": True}'/>
+                            <field name="partner_invoice_id"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"
+                                   context="{'default_type':'invoice'}"
+                                   options='{"always_reload": True}'
+                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
+                            <field name="partner_shipping_id"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"
+                                   context="{'default_type':'delivery'}"
+                                   options='{"always_reload": True}'
+                                   domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
+                        </group>
+
+                        <group name="order_details" string="Order Details">
+                            <field name="date_order"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"/>
+                            <field name="customer_reference"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"/>
+                            <field name="customer_po_number"
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"/>
+                            <field name="company_id"
+                                   options="{'no_create': True}"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+
+                    <!-- ====== RENTAL PERIOD - SEPARATE GROUP ====== -->
+                    <group name="rental_period" string="Rental Period">
+                        <group>
+                            <label for="rental_start_date" string="Rental Period"/>
+                            <div class="o_row">
+                                <field name="rental_start_date" 
+                                       widget="daterange" 
+                                       options="{'related_end_date': 'rental_end_date'}"
+                                       attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"
+                                       class="oe_inline"/>
+                                <i class="fa fa-long-arrow-right mx-2 oe_edit_only" aria-label="Arrow" title="Arrow"/>
+                                <field name="rental_end_date" 
+                                       widget="daterange" 
+                                       options="{'related_start_date': 'rental_start_date'}"
+                                       attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"
+                                       class="oe_inline"/>
+                            </div>
+                        </group>
+                        <group>
+                            <field name="rental_duration" 
+                                   attrs="{'readonly': [('state', 'in', ['cancel', 'confirm'])]}"/>
+                        </group>
+                    </group>
+
+                    <!-- ====== MAIN NOTEBOOK ====== -->
+                    <notebook>
+
+                        <!-- ====== QUOTATION LINES TAB ====== -->
+                        <page string="Quotation Lines" name="quotation_lines">
+                            <field name="order_line"
+                                   context="{'default_start_date': rental_start_date, 'default_end_date': rental_end_date}"
+                                   attrs="{'readonly': [('state', 'in', ('confirm', 'cancel'))]}">
+
+                                <!-- ORDER LINE: INLINE TREE VIEW -->
+                                <tree string="Quotation Lines">
+                                    <control>
+                                        <create name="add_product_control"
+                                                string="Add a product"/>
+                                    </control>
+
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="line_type" optional="hide"/>
+                                    <field name="item_code" optional="show"/>
+                                    <field name="product_id"
+                                           attrs="{'invisible': [('line_type', '=', 'set')], 'required': [('line_type', '=', 'unit')]}" 
+                                           context="{'partner_id': parent.partner_id}"
+                                           domain="[('sale_ok', '=', True), '|',
+                                                    ('company_id', '=', False),
+                                                    ('company_id', '=', parent.company_id)]"/>
+                                    <field name="name" string="Description" optional="hide"/>
+                                    <field name="start_date"/>
+                                    <field name="end_date"/>
+                                    <field name="duration" sum="Total Duration"/>
+                                    <field name="product_uom_qty" string="Qty"/>
+                                    <field name="qty_available" optional="show"/>
+                                    <field name="virtual_available" optional="show"/>
+                                    <field name="product_uom_category" invisible="1"/>
+                                    <field name="product_uom" string="UoM"
+                                           groups="uom.group_uom" optional="show"/>
+                                    <field name="price_unit"/>
+                                    <field name="company_id" invisible="1"/>
+                                </tree>
+
+                                <!-- ORDER LINE: POPUP FORM VIEW - IMPROVED LAYOUT -->
+                                <form string="Quotation Line">
+                                    <sheet>
+                                        <group>
+                                            <!-- LEFT COLUMN: PRODUCT DEFINITION -->
+                                            <group string="Product Definition">
+                                                <field name="line_type" 
+                                                       widget="radio" 
+                                                       options="{'horizontal': true}"/>
+                                                
+                                                <!-- Unit Flow -->
+                                                <field name="product_id"
+                                                       attrs="{'invisible': [('line_type', '=', 'set')], 
+                                                               'required': [('line_type', '=', 'unit')]}"
+                                                       domain="[('sale_ok', '=', True), '|',
+                                                                ('company_id', '=', False),
+                                                                ('company_id', '=', parent.company_id)]"
+                                                       context="{'partner_id': parent.partner_id}"/>
+                                                
+                                                <!-- Set Flow -->
+                                                <field name="rental_set_id"
+                                                       attrs="{'invisible': [('line_type', '=', 'unit')], 
+                                                               'required': [('line_type', '=', 'set')]}"/>
+                                                
+                                                <field name="item_code" string="Product Code"/>
+                                                <field name="name" 
+                                                       string="Description" 
+                                                       placeholder="Enter product description..."/>
+                                            </group>
+
+                                            <!-- RIGHT COLUMN: RENTAL PERIOD -->
+                                            <group string="Rental Period">
+                                                <label for="start_date" string="Period"/>
+                                                <div class="o_row">
+                                                    <field name="start_date" 
+                                                           widget="daterange" 
+                                                           options="{'related_end_date': 'end_date'}"
+                                                           class="oe_inline"/>
+                                                    <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow" title="Arrow"/>
+                                                    <field name="end_date" 
+                                                           widget="daterange" 
+                                                           options="{'related_start_date': 'start_date'}"
+                                                           class="oe_inline"/>
+                                                </div>
+                                                <field name="duration"/>
+                                            </group>
+                                        </group>
+
+                                        <!-- PRICING & AVAILABILITY SECTION -->
+                                        <group string="Pricing &amp; Availability">
+                                            <group string="Pricing">
+                                                <label for="product_uom_qty"/>
+                                                <div class="o_row">
+                                                    <field name="product_uom_qty" class="oe_inline"/>
+                                                    <field name="product_uom"
+                                                           groups="uom.group_uom"
+                                                           class="oe_inline"
+                                                           attrs="{'invisible': [('line_type', '=', 'set')]}"/>
+                                                </div>
+                                                <field name="price_unit" string="Unit Price"/>
+                                                <field name="product_uom_category" invisible="1"/>
+                                            </group>
+
+                                            <group string="Stock Analysis" attrs="{'invisible': [('line_type', '=', 'set')]}">
+                                                <label for="qty_available" string="On Hand"/>
+                                                <div>
+                                                    <field name="qty_available" class="oe_inline"/>
+                                                </div>
+                                                <label for="virtual_available" string="Forecasted"/>
+                                                <div>
+                                                    <field name="virtual_available" class="oe_inline"/>
+                                                </div>
+                                            </group>
+                                        </group>
+
+                                        <field name="sequence" invisible="1"/>
+                                        <field name="company_id" invisible="1"/>
+                                    </sheet>
+                                </form>
+
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+
+                <!-- ====== CHATTER ====== -->
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="activity_ids" widget="mail_activity"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL QUOTATION: SEARCH VIEW                                  -->
+    <!-- ================================================================== -->
+
+    <record id="view_gdi_rental_quotation_search" model="ir.ui.view">
+        <field name="name">gdi.rental.quotation.search</field>
+        <field name="model">gdi.rental.quotation</field>
+        <field name="arch" type="xml">
+            <search string="Search Rental Quotations">
+                <field name="name" string="Reference"/>
+                <field name="partner_id" operator="child_of"/>
+                <field name="customer_reference"/>
+                <separator/>
+                <filter string="Draft" name="draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter string="Sent" name="sent"
+                        domain="[('state', '=', 'sent')]"/>
+                <filter string="Confirmed" name="confirmed"
+                        domain="[('state', '=', 'confirm')]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state"
+                            context="{'group_by': 'state'}"/>
+                    <filter string="Customer" name="group_partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter string="Order Date" name="group_date"
+                            context="{'group_by': 'date_order:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL QUOTATION: WINDOW ACTION                                -->
+    <!-- ================================================================== -->
+
+    <record id="action_gdi_rental_quotation" model="ir.actions.act_window">
+        <field name="name">GDI Rental Quotation</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">gdi.rental.quotation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_gdi_rental_quotation_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new GDI Rental Quotation.
+            </p>
+        </field>
+    </record>
+
+</odoo>
