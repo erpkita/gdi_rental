@@ -20,27 +20,26 @@ class RentalContract(models.Model):
     name = fields.Text(string='Name', required=True, default=lambda self: _('New'))
     customer_reference = fields.Char(string="Customer Reference", copy=False)
     customer_po_number = fields.Char(string="Customer Ref. PO", copy=False)
-    start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", compute="_compute_end_date", store=True)
+    # --- Dates & Duration ---
+    start_date = fields.Date(
+        string='Start Date',
+        compute='_compute_rental_dates', store=True, readonly=False)
+    end_date = fields.Date(
+        string='End Date',
+        compute='_compute_rental_dates', store=True, readonly=False)
+    rental_duration = fields.Float(
+        string='Duration (Months)',
+        compute='_compute_rental_duration', store=True, readonly=False)
 
-    duration = fields.Integer(string="Duration", default=1, required=True, compute="_compute_duration_from_lines", inverse="_inverse_duration", store=True)
+    # Backward compatibility
+    duration = fields.Integer(
+        string='Duration', compute='_compute_duration_compat', store=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
-        ('month', 'Months')
-    ], string="Unit", required=True,
-    compute="_compute_duration_from_lines",
-    inverse="_inverse_duration",
-    store=True,
-    default='month'
-    )    
-
-    date_definition_level = fields.Selection([
-        ('order', 'Rental Order Level'),
-        ('item', 'Rental Order Item Level')
-    ], string="Date Definition Lvl", default='order',
-       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level.")
+        ('week', 'Weeks'),
+        ('month', 'Months'),
+    ], string='Unit', default='month')
     pricelist_id = fields.Many2one(
         'product.pricelist', string='Pricelist', check_company=True,  # Unrequired company
         required=True, domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", tracking=1,
@@ -72,6 +71,17 @@ class RentalContract(models.Model):
         ('cancel', 'Cancelled')
     ], string="Status", default='draft')
 
+    previous_contract_id = fields.Many2one(
+        'rental.contract', string='Previous Contract',
+        readonly=True, copy=False,
+        help="The contract this extension replaces.")
+    extension_contract_id = fields.Many2one(
+        'rental.contract', string='Extension Contract',
+        compute='_compute_extension_contract', store=False,
+        help="The contract that extended this one.")
+    extension_count = fields.Integer(
+        string='Extension #', compute='_compute_extension_number')
+
     warehouse_id = fields.Many2one(
         'stock.warehouse',
         string='Warehouse',
@@ -82,69 +92,50 @@ class RentalContract(models.Model):
         ], limit=1)
     )
     
-    @api.depends('start_date', 'duration', 'duration_unit')
-    def _compute_end_date(self):
-        for record in self:
-            if not record.start_date:
-                record.end_date = False
-                continue
-                
-            if record.duration_unit == 'hour':
-                # For hours, we need to handle it differently as Date fields don't have hours
-                # This is a simplified approach - you might need to convert to datetime if precision is critical
-                record.end_date = record.start_date + relativedelta(hours=record.duration)
-            elif record.duration_unit == 'day':
-                record.end_date = record.start_date + relativedelta(days=record.duration)
-            elif record.duration_unit == 'week':
-                record.end_date = record.start_date + relativedelta(weeks=record.duration)
-            elif record.duration_unit == 'month':
-                record.end_date = record.start_date + relativedelta(months=record.duration)
+    @api.depends('contract_line_ids.start_date', 'contract_line_ids.end_date')
+    def _compute_rental_dates(self):
+        for rec in self:
+            dates_start = rec.contract_line_ids.mapped('start_date')
+            dates_end = rec.contract_line_ids.mapped('end_date')
+            valid_starts = [d for d in dates_start if d]
+            valid_ends = [d for d in dates_end if d]
+            if valid_starts:
+                rec.start_date = min(valid_starts)
+            if valid_ends:
+                rec.end_date = max(valid_ends)
 
-    @api.model
-    def _convert_to_days(self, duration, duration_unit):
-        """Convert any duration unit to approximate days for comparison"""
-        if duration_unit == 'hour':
-            return duration / 24
-        elif duration_unit == 'day':
-            return duration
-        elif duration_unit == 'week':
-            return duration * 7
-        elif duration_unit == 'month':
-            return duration * 30  # Approximation
-        return 0
-    
-    # @api.onchange('duration', 'duration_unit')
-    # def _onchange_header_duration(self):
-    #     """Update all line durations when header duration changes"""
-    #     if self.contract_line_ids:
-    #         for line in self.contract_line_ids:
-    #             line.duration = self.duration
-    #             line.duration_unit = self.duration_unit
+    @api.depends('start_date', 'end_date')
+    def _compute_rental_duration(self):
+        for rec in self:
+            if rec.start_date and rec.end_date:
+                delta = relativedelta(rec.end_date, rec.start_date)
+                rec.rental_duration = (
+                    (delta.years * 12) + delta.months + (delta.days / 30.0))
+            else:
+                rec.rental_duration = 0.0
 
-    @api.depends("contract_line_ids", "contract_line_ids.duration", "contract_line_ids.duration_unit")
-    def _compute_duration_from_lines(self):
-        for record in self:
-            record.update_header_duration()
+    @api.depends('rental_duration')
+    def _compute_duration_compat(self):
+        """Backward compat: Integer duration for contracts."""
+        for rec in self:
+            rec.duration = max(1, round(rec.rental_duration or 1))
 
-    def _inverse_duration(self):
-        # Just allow the fields to be editable.
-        pass    
-    
-    def update_header_duration(self):
-        """Update header duration based on longest line item"""
-        longest_days = 0
-        longest_duration = self.duration
-        longest_unit = self.duration_unit
-        
-        for line in self.contract_line_ids:
-            line_days = self._convert_to_days(line.duration, line.duration_unit)
-            if line_days > longest_days:
-                longest_days = line_days
-                longest_duration = line.duration
-                longest_unit = line.duration_unit
-        
-        self.duration = longest_duration
-        self.duration_unit = longest_unit
+    def _compute_extension_contract(self):
+        """Find the contract that extended this one."""
+        for rec in self:
+            rec.extension_contract_id = self.search([
+                ('previous_contract_id', '=', rec.id)
+            ], limit=1)
+
+    def _compute_extension_number(self):
+        """Count how many times this rental has been extended (chain depth)."""
+        for rec in self:
+            count = 0
+            contract = rec
+            while contract.previous_contract_id:
+                count += 1
+                contract = contract.previous_contract_id
+            rec.extension_count = count
 
     @api.model
     def create(self, vals):
@@ -206,6 +197,10 @@ class RentalContract(models.Model):
                 created_pickings |= picking
                 
                 picking.action_confirm()
+
+                # Auto-carry lot/serial numbers from previous contract's DO
+                contract._carry_lots_from_previous_contract(picking)
+
                 # Update contract state only after successful creation
                 contract.write({'state': 'signed'})
             # except Exception as e:
@@ -352,9 +347,14 @@ class RentalContract(models.Model):
                     rental_item, current_datetime
                 )
             
-            # Update rental order line state
+            # Update rental order line state and component states
             if contract_line.ro_line_id:
                 contract_line.ro_line_id.write({'rental_state': 'active'})
+                # Set components to 'ongoing' so they become replaceable
+                draft_components = contract_line.ro_line_id.component_line_ids.filtered(
+                    lambda c: c.state == 'draft')
+                if draft_components:
+                    draft_components.write({'state': 'ongoing'})
 
     def _create_stock_move(self, contract_line, contract, picking, picking_type, 
                         rental_item, current_datetime, component=None):
@@ -423,6 +423,78 @@ class RentalContract(models.Model):
                 contract_line, contract, picking, picking_type,
                 rental_item, current_datetime, component=component
             )
+
+    def _carry_lots_from_previous_contract(self, new_picking):
+        """
+        Auto-assign lot/serial numbers from the previous contract's DO
+        to the new DO's move lines after confirmation/reservation.
+
+        This prevents the user from having to manually re-assign lots
+        when extending a rental contract.
+        """
+        if not self.previous_contract_id:
+            return
+
+        # Find the previous contract's outbound delivery order
+        prev_picking = self.env['stock.picking'].search([
+            ('rental_contract_id', '=', self.previous_contract_id.id),
+            ('is_rental_do', '=', True),
+            ('state', '=', 'done'),
+        ], limit=1, order='id desc')
+
+        if not prev_picking:
+            _logger.info(
+                "No completed previous DO found for contract %s — "
+                "skipping lot auto-assignment.", self.name)
+            return
+
+        # Build mapping: (ro_line_id, component_id) -> [lot_id, ...]
+        lot_map = {}
+        for prev_move in prev_picking.move_lines:
+            key = (prev_move.ro_line_id.id or 0,
+                   prev_move.rental_order_component_id.id or 0)
+            lot_ids = []
+            for ml in prev_move.move_line_ids:
+                if ml.lot_id:
+                    lot_ids.append(ml.lot_id.id)
+            if lot_ids:
+                lot_map[key] = lot_ids
+
+        if not lot_map:
+            return
+
+        # Assign lots to the new DO's move lines
+        for new_move in new_picking.move_lines:
+            key = (new_move.ro_line_id.id or 0,
+                   new_move.rental_order_component_id.id or 0)
+            prev_lot_ids = lot_map.get(key, [])
+            if not prev_lot_ids:
+                continue
+
+            lot_idx = 0
+            for ml in new_move.move_line_ids:
+                if not ml.lot_id and lot_idx < len(prev_lot_ids):
+                    ml.write({'lot_id': prev_lot_ids[lot_idx]})
+                    lot_idx += 1
+
+            # If no move_line_ids were created (e.g. no reservation),
+            # create them manually with lot assignments
+            if not new_move.move_line_ids and prev_lot_ids:
+                for lot_id in prev_lot_ids:
+                    self.env['stock.move.line'].create({
+                        'move_id': new_move.id,
+                        'picking_id': new_picking.id,
+                        'product_id': new_move.product_id.id,
+                        'product_uom_id': new_move.product_uom.id,
+                        'location_id': new_move.location_id.id,
+                        'location_dest_id': new_move.location_dest_id.id,
+                        'lot_id': lot_id,
+                        'product_uom_qty': new_move.product_uom_qty,
+                    })
+
+        _logger.info(
+            "Auto-assigned lots from previous DO %s to new DO %s",
+            prev_picking.name, new_picking.name)
 
     def _create_physical_inventory(self, picking_type_id):
         """

@@ -227,16 +227,30 @@ class RentalOrderComponent(models.Model):
     name = fields.Text(string='Description', required=True)
     product_uom_qty = fields.Float(string='Quantity', digits='Product Unit of Measure', required=True, default=1.0)
     product_uom_category_id = fields.Many2one('uom.category', related='product_id.uom_id.category_id', string="Uom Categ")
-    product_uom = fields.Many2one('uom.uom', 
-                                  string='Unit of Measure', 
-                                  domain="[('category_id', '=', product_uom_category_id)]", 
+    product_uom = fields.Many2one('uom.uom',
+                                  string='Unit of Measure',
+                                  domain="[('category_id', '=', product_uom_category_id)]",
                                   ondelete="restrict")
     price_unit = fields.Float('Unit Price', required=True, digits='Product Price', default=0.0)
     state = fields.Selection([
         ('draft', 'Draft'),
         ('ongoing', 'Consumed'),
-        ('returned', 'Returned')
+        ('returned', 'Returned'),
+        ('replaced', 'Replaced'),
     ], string="Status", default="draft")
+
+    # Replacement chain
+    replaced_by_component_id = fields.Many2one(
+        "rental.order.component", string="Replaced By",
+        readonly=True, copy=False,
+        help="The new component that replaced this one.")
+    replaces_component_id = fields.Many2one(
+        "rental.order.component", string="Replaces",
+        readonly=True, copy=False,
+        help="The old component that this one replaced.")
+    replacement_log_ids = fields.One2many(
+        "rental.component.replacement", "old_component_id",
+        string="Replacement History")
 
     available_qty = fields.Float(string="Available Qty", compute="_get_available_qty")
     src_location_id = fields.Many2one("stock.location", string="Source Location")
@@ -244,7 +258,7 @@ class RentalOrderComponent(models.Model):
     available_src_location_txt = fields.Text("Available Src Location", compute="_get_available_src_location")
     lot_id = fields.Many2one("stock.production.lot", domain=[('product_id', '=', product_id)])
 
-    duration = fields.Integer(string="Duration", related="order_line_id.duration")
+    duration = fields.Float(string="Duration", related="order_line_id.duration")
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
@@ -414,9 +428,23 @@ class RentalOrderComponent(models.Model):
     def _get_rental_pricing_list(self, product):
         if not product or not product.rental_pricing_ids:
             return False
-        
+
         return {price.unit: price.price for price in product.rental_pricing_ids}
-    
+
+    def action_replace_component(self):
+        """Open the component replacement wizard."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'rental.component.replacement.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref(
+                'gdi_rental.view_rental_component_replacement_wizard_form').id,
+            'target': 'new',
+            'context': {'default_component_id': self.id},
+        }
+
+
 class RentalContractComponent(models.Model):
     _name = "rental.contract.component"
     _description = "Rental Contract Components"
@@ -444,11 +472,11 @@ class RentalContractComponent(models.Model):
     available_src_location_txt = fields.Text("Available Src Location", compute="_get_available_src_location")
     lot_id = fields.Many2one("stock.production.lot", domain=[('product_id', '=', product_id)])
 
-    duration = fields.Integer(string="Duration", related="contract_line_id.duration")
+    duration = fields.Float(string="Duration", related="contract_line_id.duration")
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
+        ('week', 'Weeks'),
         ('month', 'Months')
     ], string="Unit", related="contract_line_id.duration_unit")
 

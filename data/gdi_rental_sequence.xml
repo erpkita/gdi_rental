@@ -25,9 +25,23 @@
         </record>
 
         <record id="gdi_rental_quotation_new_sequence" model="ir.sequence">
-            <field name="name">GDI Rental Quotation (New)</field>
+            <field name="name">GDI Rental Quotation</field>
             <field name="code">gdi.rental.quotation</field>
-            <field name="prefix">GRQ%(y)s%(month)s</field>
+            <field name="prefix">RQ%(y)s%(month)s</field>
+            <field name="padding">4</field>
+        </record>
+
+        <record id="gdi_rental_order_sequence" model="ir.sequence">
+            <field name="name">GDI Rental Order</field>
+            <field name="code">gdi.rental.order</field>
+            <field name="prefix">%(y)s%(month)s</field>
+            <field name="padding">4</field>
+        </record>
+
+        <record id="gdi_rental_component_replacement_sequence" model="ir.sequence">
+            <field name="name">Rental Component Replacement</field>
+            <field name="code">rental.component.replacement.seq</field>
+            <field name="prefix">RPL%(y)s%(month)s</field>
             <field name="padding">4</field>
         </record>
 

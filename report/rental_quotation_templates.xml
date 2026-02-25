@@ -12,21 +12,30 @@
                     <div style="font-size:13px;" t-field="doc.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
                     <div class="pt-2" style="font-size:13px;">
                         <div>Tel &#160;&#160;&#160;&#160;:
-                            <t t-if="doc.partner_id.phone"> 
+                            <t t-if="doc.partner_id.phone">
                                 <span t-field="doc.partner_id.phone"/>
                             </t>
                         </div>
-                        <div>Fax &#160;&#160;&#160;:
-                            <t t-if="doc.partner_id.phone"> 
-                                <span t-field="doc.partner_id.phone"/>
+                        <div>Email &#160;:
+                            <t t-if="doc.partner_id.email">
+                                <span t-field="doc.partner_id.email"/>
                             </t>
                         </div>
-                        <div>Attn &#160;: <span t-fiel="doc.partner_contact_person_id.name" /></div>
+                        <div>Attn &#160;:
+                            <t t-if="doc.partner_shipping_id">
+                                <span t-field="doc.partner_shipping_id.name"/>
+                            </t>
+                            <t t-else="">
+                                <span t-field="doc.partner_id.name"/>
+                            </t>
+                        </div>
                     </div>
                 </div>
                 <div class="col-5">
                     <strong>Shipping Address:</strong>
-                    <div style="font-size:13px;" t-field="doc.partner_shipping_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+                    <t t-if="doc.partner_shipping_id">
+                        <div style="font-size:13px;" t-field="doc.partner_shipping_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+                    </t>
                 </div>
             </div>
             <div class="page" style="font-size:14px;">
@@ -49,11 +58,30 @@
                         <strong>Validity Date:</strong>
                         <p class="m-0" t-field="doc.validity_date"/>
                     </div>
-                    <div t-if="doc.pricelist_id" class="col-auto col-3 mw-100 mb-2">
-                        <strong>Pricelist:</strong>
-                        <p class="m-0" t-field="doc.pricelist_id.name"/>
+                    <div t-if="doc.customer_po_number" class="col-auto col-3 mw-100 mb-2">
+                        <strong>Customer PO No.:</strong>
+                        <p class="m-0" t-field="doc.customer_po_number"/>
                     </div>
                 </div>
+
+                <!-- Rental Period -->
+                <div class="row mb32" t-if="doc.rental_start_date or doc.rental_end_date">
+                    <div t-if="doc.rental_start_date" class="col-auto col-3 mw-100 mb-2">
+                        <strong>Rental Start Date:</strong>
+                        <p class="m-0" t-field="doc.rental_start_date"/>
+                    </div>
+                    <div t-if="doc.rental_end_date" class="col-auto col-3 mw-100 mb-2">
+                        <strong>Rental End Date:</strong>
+                        <p class="m-0" t-field="doc.rental_end_date"/>
+                    </div>
+                    <div t-if="doc.rental_duration" class="col-auto col-3 mw-100 mb-2">
+                        <strong>Duration:</strong>
+                        <p class="m-0">
+                            <span t-field="doc.rental_duration"/> Month(s)
+                        </p>
+                    </div>
+                </div>
+
                 <div class="row">
                     <div class="col-12">
                         <p>Refer to your reference above, we are pleased to quote you as follows :</p>
@@ -64,19 +92,18 @@
                 <t t-set="display_discount" t-value="any(l.discount for l in doc.order_line)"/>
                 <div class="pt-2"></div>
                 <table class="table table-sm o_main_table" style="font-size:14px;">
-                    <!-- In case we want to repeat the header, remove "display: table-row-group" -->
                     <thead style="display: table-row-group">
                         <tr>
-                            <th name="th_description" class="text-left">No</th>
+                            <th name="th_no" class="text-left" style="width:5%;">No</th>
                             <th name="th_item_code" class="text-left" style="width:15%;">Item Code</th>
                             <th name="th_description" class="text-left">Description</th>
-                            <th name="th_quantity" class="text-right">Quantity</th>
-                            <th name="th_priceunit" class="text-right">Unit Price</th>
-                            <th name="th_discount" t-if="display_discount" class="text-right" groups="product.group_discount_per_so_line">
+                            <th name="th_quantity" class="text-right" style="width:10%;">Quantity</th>
+                            <th name="th_priceunit" class="text-right" style="width:12%;">Unit Price</th>
+                            <th name="th_discount" t-if="display_discount" class="text-right" style="width:8%;"
+                                groups="product.group_discount_per_so_line">
                                 <span>Disc.%</span>
                             </th>
-                            <!-- <th name="th_taxes" class="text-right">Taxes</th> -->
-                            <th name="th_subtotal" class="text-right">
+                            <th name="th_subtotal" class="text-right" style="width:15%;">
                                 <span groups="account.group_show_line_subtotals_tax_excluded">Amount</span>
                                 <span groups="account.group_show_line_subtotals_tax_included">Total Price</span>
                             </th>
@@ -94,78 +121,104 @@
                             <t t-set="no_seq" t-value="no_seq + 1"/>
 
                             <tr>
-                                <td name="td_name"><span t-esc="no_seq"/></td>
-                                <t t-if="line.item_type == 'regular' ">
-                                    <t t-if="line.product_id.item_code_ref">
-                                        <td>
+                                <td name="td_no"><span t-esc="no_seq"/></td>
+
+                                <!-- Item Code -->
+                                <td name="td_item_code">
+                                    <t t-if="line.line_type == 'unit'">
+                                        <t t-if="line.product_id.item_code_ref">
                                             <span t-field="line.product_id.item_code_ref"/>
-                                        </td>
+                                        </t>
+                                        <t t-elif="line.item_code">
+                                            <span t-field="line.item_code"/>
+                                        </t>
+                                        <t t-else="">-</t>
                                     </t>
                                     <t t-else="">
-                                        <td>-</td>
+                                        <span t-field="line.item_code"/>
                                     </t>
-                                </t>
-                                <t t-else="">
-                                    <td><span t-field="line.item_code"/></td>
-                                </t>
+                                </td>
 
+                                <!-- Description -->
                                 <td name="td_name"><span t-field="line.name"/></td>
+
+                                <!-- Quantity -->
                                 <td name="td_quantity" class="text-right">
                                     <span t-field="line.product_uom_qty"/>
                                     <span t-field="line.product_uom_txt"/>
                                 </td>
+
+                                <!-- Unit Price -->
                                 <td name="td_priceunit" class="text-right">
                                     <span t-field="line.price_unit"/>
                                 </td>
+
+                                <!-- Discount -->
+                                <td name="td_discount" class="text-right" t-if="display_discount"
+                                    groups="product.group_discount_per_so_line">
+                                    <span t-field="line.discount"/>
+                                </td>
+
+                                <!-- Subtotal / Total -->
                                 <td name="td_subtotal" class="text-right o_price_total">
                                     <span t-field="line.price_subtotal" groups="account.group_show_line_subtotals_tax_excluded"/>
                                     <span t-field="line.price_total" groups="account.group_show_line_subtotals_tax_included"/>
                                 </td>
-
                             </tr>
 
-                            <t t-if="current_section and (line_last or doc.order_line[line_index+1].display_type == 'line_section')">
-                                <tr class="is-subtotal text-right">
-                                    <td name="td_section_subtotal" colspan="99">
-                                        <strong class="mr16">Subtotal</strong>
-                                        <span
-                                            t-esc="current_subtotal"
-                                            t-options='{"widget": "monetary", "display_currency": doc.pricelist_id.currency_id}'
-                                        />
-                                    </td>
-                                </tr>
-                            </t>
                         </t>
                     </tbody>
                 </table>
 
+                <!-- Totals -->
                 <div class="clearfix" name="so_total_summary">
                     <div id="total" class="row" name="total">
-                        <div class="col-6 ml-auto"> <!--t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'} ml-auto">-->
+                        <div class="col-6 ml-auto">
                             <table class="table table-sm">
-
-                                <!--Total amount with all taxes-->
+                                <tr class="border-black" groups="account.group_show_line_subtotals_tax_excluded">
+                                    <td><strong>Subtotal</strong></td>
+                                    <td class="text-right">
+                                        <span t-field="doc.amount_untaxed"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </td>
+                                </tr>
+                                <t t-if="doc.amount_tax">
+                                    <tr>
+                                        <td>Taxes</td>
+                                        <td class="text-right">
+                                            <span t-field="doc.amount_tax"
+                                                  t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                        </td>
+                                    </tr>
+                                </t>
                                 <tr class="border-black o_total">
                                     <td><strong>Total</strong></td>
                                     <td class="text-right">
-                                        <!-- <span t-esc="tax_totals['formatted_amount_total']"/> -->
+                                        <span t-field="doc.amount_total"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
                                     </td>
                                 </tr>
-
                             </table>
                         </div>
                     </div>
                 </div>
 
                 <div class="oe_structure"/>
-                <div>
-                    <div class="col-12">Notes:</div>
-                    <div class="col-12">
-                        <p t-field="doc.note" />
-                    </div>
-                </div>
 
-                <div class="row signature">
+                <!-- Notes -->
+                <t t-if="doc.note">
+                    <div class="row mt16">
+                        <div class="col-12">
+                            <strong>Notes:</strong>
+                        </div>
+                        <div class="col-12">
+                            <span t-field="doc.note"/>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- Signature -->
+                <div class="row mt32 signature">
                     <div class="col-6">
                         <table width="100%">
                             <tr>

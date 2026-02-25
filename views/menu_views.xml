@@ -1,32 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- Dashboard Client Action -->
+    <record id="action_rental_dashboard" model="ir.actions.client">
+        <field name="name">Rental Dashboard</field>
+        <field name="tag">gdi_rental.dashboard</field>
+    </record>
+
     <menuitem id="menu_gdi_rental_root" name="GDI Rental" sequence="8">
 
         <menuitem
-            id="menu_gdi_rental_quotation_new"
-            name="GDI Rental Quotation"
-            action="gdi_rental.action_gdi_rental_quotation"
-            sequence="5"/>
+            id="menu_rental_dashboard"
+            name="Dashboard"
+            action="action_rental_dashboard"
+            sequence="1"/>
 
         <menuitem
-            id="menu_rental_quotation"
-            name="Rental Quotation"
-            action="gdi_rental.action_rental_quotation"
-            sequence="10"/>
+            id="menu_gdi_rental_main"
+            name="Rental"
+            sequence="10">
 
-        <menuitem
-            id="menu_gdi_rental_order"
-            name="Rental Order"
-            action="action_gdi_rental_order"
-            sequence="20"/>
+            <menuitem
+                id="menu_gdi_rental_quotation_new"
+                name="Quotations"
+                action="gdi_rental.action_gdi_rental_quotation"
+                sequence="1"/>
 
-        <menuitem 
-            id="menu_gdi_rental_contract"
-            name="Contracts"
-            action="action_gdi_rental_contracts_view"
-            sequence="30"
-        />
+            <menuitem
+                id="menu_gdi_rental_order"
+                name="Rental Orders"
+                action="action_gdi_rental_order"
+                sequence="2"/>
+
+            <menuitem
+                id="menu_gdi_rental_contract"
+                name="Contracts"
+                action="action_gdi_rental_contracts_view"
+                sequence="3"/>
+
+        </menuitem>
 
         <menuitem 
             id="menu_gdi_rental_delivery_order"
@@ -52,6 +64,11 @@
                 sequence="2" 
                 action="gdi_rental.gdi_rental_product_product_action" />
 
+            <menuitem id="menu_gdi_rental_set"
+                      name="Rental Sets"
+                      action="action_gdi_rental_set"
+                      sequence="3"/>
+
         </menuitem>
 
     </menuitem>
@@ -61,10 +78,6 @@
               parent="menu_gdi_rental_root"
               sequence="100"/>
 
-    <menuitem id="menu_gdi_rental_set"
-              name="Rental Sets"
-              parent="menu_gdi_rental_config"
-              action="action_gdi_rental_set"
-              sequence="20"/>
+
 
 </odoo>

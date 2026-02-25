@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 from odoo import api, fields, models, _
+
+_logger = logging.getLogger(__name__)
+
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
@@ -24,9 +29,36 @@ class StockPicking(models.Model):
         for rec in self:
             rec.picking_type_id = rental_picking_type.id
 
+    def button_validate(self):
+        """Override to sync lot/serial numbers back to rental components
+        after DO validation."""
+        res = super().button_validate()
+        for picking in self:
+            if picking.is_rental_do and picking.state == 'done':
+                picking._sync_lots_to_rental_components()
+        return res
+
+    def _sync_lots_to_rental_components(self):
+        """After DO is validated, write lot_id from stock.move.line
+        back to the corresponding rental.order.component records."""
+        for move in self.move_lines:
+            if not move.rental_order_component_id:
+                continue
+            component = move.rental_order_component_id
+            # Get the lot from the done move lines
+            done_lines = move.move_line_ids.filtered(
+                lambda ml: ml.qty_done > 0 and ml.lot_id)
+            if done_lines:
+                lot = done_lines[0].lot_id
+                if component.lot_id != lot:
+                    component.write({'lot_id': lot.id})
+                    _logger.info(
+                        "Synced lot %s to component %s (id=%s)",
+                        lot.name, component.name, component.id)
+
     def action_print_rental_picking_list(self):
-        return self.env.ref("gdi_rental.gdi_action_report_rental_picking_list").report_action(self) 
-    
+        return self.env.ref("gdi_rental.gdi_action_report_rental_picking_list").report_action(self)
+
     def action_print_rdo_pdf(self):
         return self.env.ref("gdi_rental.gdi_action_report_rdo").report_action(self)
 
@@ -78,13 +110,13 @@ class StockRentalOrderItem(models.Model):
     start_date = fields.Date(string="Start Date", required=False)
     end_date = fields.Date(string="End Date", required=False)
 
-    duration = fields.Integer(string="Duration", default=1, required=True)
+    duration = fields.Float(string="Duration (Months)", default=1.0)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
+        ('week', 'Weeks'),
         ('month', 'Months')
-    ], string="Unit", default='day', required=True)
+    ], string="Unit", default='month')
 
     contract_line_id = fields.Many2one("rental.contract.line", string="Contract Item")
 

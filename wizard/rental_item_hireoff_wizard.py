@@ -50,36 +50,102 @@ class RentalItemHireoffWizard(models.TransientModel):
     def _create_hireoff_pi(self, picking_type_id):
         """
         Create physical inventory transfer for hire-off items.
-        
-        Args:
-            picking_type_id: stock.picking.type record for the hire-off operation
-            
-        Returns:
-            stock.picking: Created picking record
-            
-        Raises:
-            UserError: when picking creation or validation fails.
+
+        Uses a multi-step approach for reliable qty_done handling in Odoo 15:
+        1. Create picking with moves (without embedded move_line_ids)
+        2. Confirm the picking
+        3. Manually set qty_done on move lines with lot tracking
+        4. Validate the picking
         """
         if not self or not self.rental_orderline_id:
             return self.env["stock.picking"]
-        
+
         try:
-            # Build all move lines first
-            move_lines = self._create_hireoff_stock_moves(picking_type_id)
-            
-            # Create picking with all moves at once
-            picking_vals = self._prepare_hireoff_picking_vals(picking_type_id, move_lines)
+            # Build move data (includes move_line info for lot tracking)
+            move_data_list = self._create_hireoff_stock_moves(picking_type_id)
+
+            if not move_data_list:
+                raise UserError(_("No stock moves to process for hire-off."))
+
+            # Separate move_line_ids from move data — apply them after confirm
+            move_line_info = []
+            clean_moves = []
+            for move_tuple in move_data_list:
+                move_vals = dict(move_tuple[2])
+                ml_data = move_vals.pop('move_line_ids', [])
+                move_line_info.append(ml_data)
+                clean_moves.append((0, 0, move_vals))
+
+            # Create picking without embedded move_line_ids
+            picking_vals = self._prepare_hireoff_picking_vals(picking_type_id, clean_moves)
             picking = self.env["stock.picking"].create(picking_vals)
-            
-            # Validate the picking
-            picking.button_validate()
-            
+
+            # Confirm the picking (draft → confirmed/assigned)
+            picking.action_confirm()
+
+            # Set qty_done on each move with lot info
+            for idx, move in enumerate(picking.move_lines.sorted('id')):
+                ml_data = move_line_info[idx] if idx < len(move_line_info) else []
+                self._apply_hireoff_move_quantities(picking, move, ml_data)
+
+            # Validate — handle immediate transfer wizard if triggered
+            res = picking.button_validate()
+            if isinstance(res, dict) and res.get('res_model') == 'stock.immediate.transfer':
+                wiz_id = res.get('res_id')
+                if wiz_id:
+                    self.env['stock.immediate.transfer'].browse(wiz_id).with_context(
+                        button_validate_picking_ids=picking.ids
+                    ).process()
+
             return picking
+        except UserError:
+            raise
         except Exception as e:
             _logger.error(f"Failed to create hire-off physical inventory: {str(e)}")
             raise UserError(
                 _("Failed to create hire-off physical inventory. Error: %s" % str(e))
             )
+
+    def _apply_hireoff_move_quantities(self, picking, move, ml_data):
+        """
+        Apply qty_done and lot tracking to a stock move after picking confirmation.
+        Creates or updates stock.move.line records with proper quantities.
+        """
+        if ml_data:
+            # Remove any auto-created reservation lines to avoid conflicts
+            if move.move_line_ids:
+                move.move_line_ids.unlink()
+
+            # Create fresh move lines with our lot/qty data
+            for ml_tuple in ml_data:
+                ml_vals = ml_tuple[2]
+                qty = ml_vals.get('qty_done') or ml_vals.get('product_uom_qty') or move.product_uom_qty
+                lot_id = ml_vals.get('lot_id', False)
+
+                self.env['stock.move.line'].create({
+                    'move_id': move.id,
+                    'picking_id': picking.id,
+                    'product_id': move.product_id.id,
+                    'product_uom_id': move.product_uom.id,
+                    'location_id': move.location_id.id,
+                    'location_dest_id': move.location_dest_id.id,
+                    'qty_done': qty,
+                    'lot_id': lot_id,
+                })
+        else:
+            # No specific move line data — set qty_done from move qty
+            if move.move_line_ids:
+                move.move_line_ids.write({'qty_done': move.product_uom_qty})
+            else:
+                self.env['stock.move.line'].create({
+                    'move_id': move.id,
+                    'picking_id': picking.id,
+                    'product_id': move.product_id.id,
+                    'product_uom_id': move.product_uom.id,
+                    'location_id': move.location_id.id,
+                    'location_dest_id': move.location_dest_id.id,
+                    'qty_done': move.product_uom_qty,
+                })
 
 
     def _prepare_hireoff_picking_vals(self, picking_type_id, move_lines):
@@ -96,8 +162,8 @@ class RentalItemHireoffWizard(models.TransientModel):
         current_datetime = fields.Datetime.now()
         
         picking_vals = {
-            'partner_id': self.rental_orderline_id.order_id.id,
-            'contact_person_id': self.rental_orderline_id.order_id.id,
+            'partner_id': self.rental_orderline_id.order_id.partner_id.id,
+            'contact_person_id': self.rental_orderline_id.order_id.partner_id.id,
             'picking_type_id': picking_type_id.id,
             'location_id': picking_type_id.default_location_dest_id.id,
             'location_dest_id': picking_type_id.default_location_src_id.id,
@@ -292,34 +358,40 @@ class RentalItemHireoffWizard(models.TransientModel):
                                             picking_type_id, current_datetime):
         """
         Prepare detailed move lines for component hire-off with lot/serial tracking.
-        
-        Args:
-            component: component line record
-            prev_component_move: previous stock.move record for this component
-            picking_type_id: stock.picking.type record
-            current_datetime: current datetime
-            
-        Returns:
-            list: List of tuples for creating stock.move.line records
+        Falls back to component data if previous move has no done quantities.
         """
         move_lines = []
-        
-        if not prev_component_move.move_line_ids:
-            return move_lines
-        
-        for moveline in prev_component_move.move_line_ids:
-            move_line_vals = {
+        location_id = picking_type_id.default_location_dest_id.id
+        location_dest_id = prev_component_move.location_id.id
+
+        if prev_component_move.move_line_ids:
+            for moveline in prev_component_move.move_line_ids:
+                # Use qty_done if available, otherwise fall back to reserved qty
+                qty = moveline.qty_done or moveline.product_uom_qty or component.product_uom_qty
+                move_lines.append((0, 0, {
+                    'product_id': component.product_id.id,
+                    'product_uom_id': component.product_uom.id,
+                    'product_uom_qty': qty,
+                    'qty_done': qty,
+                    'date': current_datetime,
+                    'location_id': location_id,
+                    'location_dest_id': location_dest_id,
+                    'lot_id': moveline.lot_id.id if moveline.lot_id else (
+                        component.lot_id.id if component.lot_id else False),
+                }))
+        else:
+            # No previous move lines — create from component data directly
+            move_lines.append((0, 0, {
                 'product_id': component.product_id.id,
                 'product_uom_id': component.product_uom.id,
-                'product_uom_qty': moveline.qty_done,
-                'qty_done': moveline.qty_done,
+                'product_uom_qty': component.product_uom_qty,
+                'qty_done': component.product_uom_qty,
                 'date': current_datetime,
-                'location_id': picking_type_id.default_location_dest_id.id,
-                'location_dest_id': prev_component_move.location_id.id,
-                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
-            }
-            move_lines.append((0, 0, move_line_vals))
-        
+                'location_id': location_id,
+                'location_dest_id': location_dest_id,
+                'lot_id': component.lot_id.id if component.lot_id else False,
+            }))
+
         return move_lines
 
 
@@ -364,35 +436,40 @@ class RentalItemHireoffWizard(models.TransientModel):
     def _prepare_hireoff_move_lines(self, line, prev_picking, picking_type_id, current_datetime):
         """
         Prepare detailed move lines with lot/serial tracking from previous picking.
+        Falls back to line data if previous move has no done quantities.
         (For non-set items)
-        
-        Args:
-            line: rental order line record
-            prev_picking: previous stock.move record
-            picking_type_id: stock.picking.type record
-            current_datetime: current datetime
-            
-        Returns:
-            list: List of tuples for creating stock.move.line records
         """
         move_lines = []
-        
-        if not prev_picking.move_line_ids:
-            return move_lines
-        
-        for moveline in prev_picking.move_line_ids:
-            move_line_vals = {
+        location_id = picking_type_id.default_location_dest_id.id
+        location_dest_id = prev_picking.location_id.id
+
+        if prev_picking.move_line_ids:
+            for moveline in prev_picking.move_line_ids:
+                # Use qty_done if available, otherwise fall back to reserved qty
+                qty = moveline.qty_done or moveline.product_uom_qty or line.product_uom_qty
+                move_lines.append((0, 0, {
+                    'product_id': line.product_id.id,
+                    'product_uom_id': line.product_uom.id,
+                    'product_uom_qty': qty,
+                    'qty_done': qty,
+                    'date': current_datetime,
+                    'location_id': location_id,
+                    'location_dest_id': location_dest_id,
+                    'lot_id': moveline.lot_id.id if moveline.lot_id else False,
+                }))
+        else:
+            # No previous move lines — create from line data directly
+            move_lines.append((0, 0, {
                 'product_id': line.product_id.id,
                 'product_uom_id': line.product_uom.id,
-                'product_uom_qty': moveline.qty_done,
-                'qty_done': moveline.qty_done,
+                'product_uom_qty': line.product_uom_qty,
+                'qty_done': line.product_uom_qty,
                 'date': current_datetime,
-                'location_id': picking_type_id.default_location_dest_id.id,
-                'location_dest_id': prev_picking.location_id.id,
-                'lot_id': moveline.lot_id.id if moveline.lot_id else False,
-            }
-            move_lines.append((0, 0, move_line_vals))
-        
+                'location_id': location_id,
+                'location_dest_id': location_dest_id,
+                'lot_id': False,
+            }))
+
         return move_lines
                     
         

@@ -10,8 +10,9 @@
                     <group>
                         <field name="rental_id" readonly="1"/>
                     </group>
-                    <group></group>
+                    <group/>
                 </group>
+
                 <group string="Customer Reference">
                     <group>
                         <field name="customer_reference" string="Customer Ref."/>
@@ -20,22 +21,25 @@
                         <field name="customer_po_number"/>
                     </group>
                 </group>
-                <group string="Rental Overview">
-                    <group string="Duration">
-                        <label for="duration"/>
+
+                <group string="Rental Schedule">
+                    <group string="Period">
+                        <label for="start_date" string="Rental Period"/>
                         <div class="o_row">
-                            <field name="duration"/>
-                            <field name="duration_unit"/>
+                            <field name="start_date" class="oe_inline"/>
+                            <i class="fa fa-long-arrow-right mx-2"
+                               aria-label="Arrow" title="Arrow"/>
+                            <field name="end_date" class="oe_inline"/>
                         </div>
-                        <div class="alert-secondary" colspan="2" role="alert" style="margin-bottom: 8px;">
-                            <strong>Info:</strong> This duration is based on the item with the longest rental period among the selected items.
-                        </div>
+                        <field name="rental_duration" string="Duration (Months)"
+                               readonly="1"/>
                     </group>
-                    <group string="Schedule">
-                        <field name="start_date" string="Start Date"/>
-                        <field name="end_date" string="Initial End Date" readonly="1"/>
+                    <group string="Reference">
+                        <field name="duration" invisible="1"/>
+                        <field name="duration_unit" invisible="1"/>
                     </group>
                 </group>
+
                 <notebook>
                     <page string="Rental Items">
                         <field name="rental_contract_wizard_ids">
@@ -65,29 +69,30 @@
                                     </group>
                                 </group>
                                 <group>
-                                    <group string="Rental Duration">
-                                        <label for="duration"/>
+                                    <group string="Rental Period">
+                                        <label for="start_date" string="Rental Period"/>
                                         <div class="o_row">
-                                            <field name="duration" required="1"/>
-                                            <field name="duration_unit"/>
+                                            <field name="start_date" class="oe_inline"/>
+                                            <i class="fa fa-long-arrow-right mx-2"
+                                               aria-label="Arrow" title="Arrow"/>
+                                            <field name="end_date" class="oe_inline"/>
                                         </div>
-                                        <label for="start_date" string="From"/>
-                                        <div class="o_row">
-                                            <field name="start_date" nolabel="1" class="oe_inline" readonly="1"/>
-                                            <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                            <field name="end_date" nolabel="1" class="oe_inline" readonly="1"/>
-                                        </div>
+                                        <field name="duration" string="Duration (Months)"
+                                               readonly="1"/>
+                                        <field name="duration_unit" invisible="1"/>
                                     </group>
                                     <group string="Price and Quantity">
                                         <field name="product_uom_category_id" invisible="1"/>
                                         <label for="product_uom_qty"/>
-                                        <div class="o_row" name="ordered_qty">
+                                        <div class="o_row">
                                             <field name="product_uom_qty"/>
                                             <field name="product_uom"
-                                                    force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
-                                                    groups="uom.group_uom" 
-                                                    class="oe_no_button"/>
-                                            <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
+                                                   force_save="1"
+                                                   attrs="{'invisible': [('item_type', '!=', 'unit')]}"
+                                                   groups="uom.group_uom"
+                                                   class="oe_no_button"/>
+                                            <field name="product_uom_txt"
+                                                   attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
                                         </div>
                                         <field name="price_unit"/>
                                     </group>
@@ -96,10 +101,12 @@
                         </field>
                     </page>
                 </notebook>
-              <footer>
-                  <button string="Create" type="object" name="action_create_contract" class="btn-primary"/>
-                  <button string="Cancel" class="btn-secondary" special="cancel"/>
-              </footer>
+
+                <footer>
+                    <button string="Create" type="object"
+                            name="action_create_contract" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
             </form>
         </field>
     </record>

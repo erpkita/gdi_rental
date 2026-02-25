@@ -72,29 +72,20 @@ class GdiRentalOrderLine(models.Model):
     tax_id = fields.Many2many(
         'account.tax', string='Taxes', context={'active_test': False})
 
-    # --- Duration ---
-    duration = fields.Integer(string='Duration', required=True)
+    # --- Rental Period ---
+    start_date = fields.Date(string='Start Date')
+    end_date = fields.Date(string='End Date')
+    duration = fields.Float(
+        string='Duration (Months)',
+        compute='_compute_duration', store=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
         ('week', 'Weeks'),
         ('month', 'Months'),
-    ], string='Unit', required=True)
+    ], string='Unit', default='month')
     duration_string = fields.Char(
         string='Duration Str', compute='_compute_duration_str')
-
-    # --- Dates ---
-    start_date = fields.Date(
-        string='Start Date',
-        compute='_compute_start_date', store=True,
-        inverse='_inverse_start_date')
-    end_date = fields.Date(
-        string='End Date',
-        compute='_compute_end_date', store=True,
-        inverse='_inverse_end_date')
-    date_definition_level = fields.Selection(
-        related='order_id.date_definition_level',
-        string='Date Definition Level')
 
     # --- Components (SET only) ---
     component_line_ids = fields.One2many(
@@ -122,6 +113,11 @@ class GdiRentalOrderLine(models.Model):
         related='order_id.state', store=True, copy=False)
     product_type = fields.Selection(
         related='product_id.type', string='Product Type')
+
+    # --- Replacement History ---
+    replacement_ids = fields.One2many(
+        'rental.component.replacement', 'order_line_id',
+        string='Component Replacements')
 
     # --- Stock Moves ---
     stock_move_ids = fields.One2many(
@@ -202,39 +198,21 @@ class GdiRentalOrderLine(models.Model):
     # COMPUTE — DURATION & DATES
     # -------------------------------------------------------------------------
 
-    @api.depends('duration', 'duration_unit')
+    @api.depends('start_date', 'end_date')
+    def _compute_duration(self):
+        for line in self:
+            if line.start_date and line.end_date:
+                delta = relativedelta(line.end_date, line.start_date)
+                line.duration = (
+                    (delta.years * 12) + delta.months
+                    + (delta.days / 30.0))
+            else:
+                line.duration = 0.0
+
+    @api.depends('duration')
     def _compute_duration_str(self):
-        labels = dict(self._fields['duration_unit'].selection)
         for line in self:
-            line.duration_string = f"{line.duration} {labels.get(line.duration_unit, '')}"
-
-    @api.depends('order_id', 'order_id.start_date')
-    def _compute_start_date(self):
-        for line in self:
-            line.start_date = line.order_id.start_date
-
-    def _inverse_start_date(self):
-        pass
-
-    @api.depends('start_date', 'duration', 'duration_unit')
-    def _compute_end_date(self):
-        delta_map = {
-            'hour': lambda d: relativedelta(hours=d),
-            'day': lambda d: relativedelta(days=d),
-            'week': lambda d: relativedelta(weeks=d),
-            'month': lambda d: relativedelta(months=d),
-        }
-        for line in self:
-            if not line.start_date or not line.duration_unit:
-                line.end_date = False
-                continue
-            delta_fn = delta_map.get(line.duration_unit)
-            line.end_date = (
-                line.start_date + delta_fn(line.duration)
-                if delta_fn else False)
-
-    def _inverse_end_date(self):
-        pass
+            line.duration_string = f"{line.duration:.1f} Month(s)"
 
     @api.depends('start_date')
     def _compute_scheduled_date(self):
@@ -405,9 +383,8 @@ class GdiRentalOrderLine(models.Model):
                 self._context['default_order_id'])
             if order:
                 res.update({
-                    'duration': order.duration,
-                    'duration_unit': order.duration_unit,
                     'start_date': order.start_date,
+                    'end_date': order.end_date,
                 })
         return res
 
@@ -437,16 +414,28 @@ class GdiRentalOrderLine(models.Model):
 
         pricing = self._get_rental_pricing_list(product)
         if not pricing:
-            raise ValidationError(
-                _("Rental price for duration '%s' is not configured for this "
-                  "product.") % self.duration_unit)
-        if self.duration_unit not in pricing:
-            available = ', '.join(pricing.keys())
-            raise ValidationError(
-                _("This product is not available for rental by %s. "
-                  "Available: %s.") % (self.duration_unit, available))
+            self.price_unit = product.lst_price
+            return
 
-        rental_price = pricing[self.duration_unit] * self.duration
+        # Compute duration in months from dates
+        duration_months = 1.0
+        if self.start_date and self.end_date:
+            delta = relativedelta(self.end_date, self.start_date)
+            duration_months = max(
+                1.0,
+                (delta.years * 12) + delta.months + (delta.days / 30.0))
+
+        # Find best pricing match (prefer 'month')
+        if 'month' in pricing:
+            rental_price = pricing['month'] * duration_months
+        elif 'week' in pricing:
+            rental_price = pricing['week'] * (duration_months * 4.33)
+        elif 'day' in pricing:
+            rental_price = pricing['day'] * (duration_months * 30)
+        else:
+            first_unit = list(pricing.keys())[0]
+            rental_price = pricing[first_unit]
+
         self.price_unit = product._get_tax_included_unit_price(
             self.company_id,
             self.order_id.currency_id,
@@ -518,10 +507,17 @@ class GdiRentalOrderLine(models.Model):
 
         self._compute_rental_price()
 
-    @api.onchange('duration', 'duration_unit')
-    def _onchange_duration(self):
-        if self.product_id:
+    @api.onchange('start_date', 'end_date')
+    def _onchange_dates(self):
+        """Recalculate price when dates change (duration changes)."""
+        if (self.product_id and self.start_date and self.end_date):
             self._compute_rental_price()
+
+    @api.onchange('order_id')
+    def _onchange_order_id(self):
+        if self.order_id:
+            self.start_date = self.order_id.start_date
+            self.end_date = self.order_id.end_date
 
     @api.onchange('component_line_ids')
     def _onchange_component_line_ids(self):
@@ -559,8 +555,7 @@ class GdiRentalOrderLine(models.Model):
             'item_type': self.item_type,
             'start_date': self.start_date or False,
             'end_date': self.end_date or False,
-            'duration': self.duration,
-            'duration_unit': self.duration_unit,
+            'duration_unit': self.duration_unit or 'month',
             'ro_line_id': self.id,
         }
         if self.item_type == 'set' and self.component_line_ids:

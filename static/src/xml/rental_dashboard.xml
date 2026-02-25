@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates id="template" xml:space="preserve">
+
+    <!-- ================================================================== -->
+    <!-- MAIN WRAPPER                                                        -->
+    <!-- ================================================================== -->
+    <t t-name="gdi_rental.DashboardMain">
+        <div class="o_rental_dashboard">
+            <div class="o_rental_dashboard_content"/>
+        </div>
+    </t>
+
+    <!-- ================================================================== -->
+    <!-- DASHBOARD CONTENT                                                   -->
+    <!-- ================================================================== -->
+    <t t-name="gdi_rental.DashboardContent">
+
+        <!-- ====== HEADER ====== -->
+        <div class="o_rental_dashboard_header">
+            <h2>Rental Dashboard</h2>
+            <div class="o_dashboard_shortcuts">
+                <button type="button" class="o_shortcut_btn o_shortcut_primary o_shortcut_action" data-shortcut="new_rq">
+                    <i class="fa fa-plus"/> New Quotation
+                </button>
+                <button type="button" class="o_shortcut_btn o_shortcut_action" data-shortcut="all_rq">
+                    <i class="fa fa-file-text-o"/> Quotations
+                </button>
+                <button type="button" class="o_shortcut_btn o_shortcut_action" data-shortcut="all_ro">
+                    <i class="fa fa-list"/> Rental Orders
+                </button>
+                <button type="button" class="o_shortcut_btn o_shortcut_action" data-shortcut="all_contracts">
+                    <i class="fa fa-handshake-o"/> Contracts
+                </button>
+            </div>
+        </div>
+
+        <!-- ====== KPI CARDS ====== -->
+        <div class="o_rental_kpi_row">
+            <div class="o_rental_kpi_card o_dashboard_action" data-action="draft_rq">
+                <div class="o_kpi_icon"><i class="fa fa-file-text-o"/></div>
+                <div class="o_kpi_value"><t t-esc="data.kpi.draft_rq"/></div>
+                <div class="o_kpi_label">Draft RQ</div>
+            </div>
+            <div class="o_rental_kpi_card o_dashboard_action" data-action="confirmed_ro">
+                <div class="o_kpi_icon"><i class="fa fa-check-circle"/></div>
+                <div class="o_kpi_value"><t t-esc="data.kpi.confirmed_ro"/></div>
+                <div class="o_kpi_label">Confirmed RO</div>
+            </div>
+            <div class="o_rental_kpi_card o_dashboard_action" data-action="active_contracts">
+                <div class="o_kpi_icon"><i class="fa fa-handshake-o"/></div>
+                <div class="o_kpi_value"><t t-esc="data.kpi.active_contracts"/></div>
+                <div class="o_kpi_label">Active Contracts</div>
+            </div>
+            <div class="o_rental_kpi_card o_dashboard_action" data-action="ongoing_ro">
+                <div class="o_kpi_icon"><i class="fa fa-truck"/></div>
+                <div class="o_kpi_value"><t t-esc="data.kpi.ongoing_ro"/></div>
+                <div class="o_kpi_label">Ongoing Rentals</div>
+            </div>
+            <div class="o_rental_kpi_card o_dashboard_action" data-action="ongoing_ro">
+                <div class="o_kpi_icon"><i class="fa fa-cubes"/></div>
+                <div class="o_kpi_value"><t t-esc="data.kpi.items_on_rent"/></div>
+                <div class="o_kpi_label">Items on Rent</div>
+            </div>
+            <t t-if="data.kpi.overdue > 0">
+                <div class="o_rental_kpi_card o_kpi_danger o_dashboard_action" data-action="overdue_contracts">
+                    <div class="o_kpi_icon"><i class="fa fa-exclamation-circle"/></div>
+                    <div class="o_kpi_value"><t t-esc="data.kpi.overdue"/></div>
+                    <div class="o_kpi_label">Overdue</div>
+                </div>
+            </t>
+            <t t-if="data.kpi.expiring_soon > 0">
+                <div class="o_rental_kpi_card o_kpi_warning o_dashboard_action" data-action="expiring_soon">
+                    <div class="o_kpi_icon"><i class="fa fa-clock-o"/></div>
+                    <div class="o_kpi_value"><t t-esc="data.kpi.expiring_soon"/></div>
+                    <div class="o_kpi_label">Expiring &lt; 30d</div>
+                </div>
+            </t>
+        </div>
+
+        <!-- ====== OVERDUE + EXPIRING CONTRACTS ====== -->
+        <div class="o_rental_grid_row">
+
+            <!-- LEFT: Overdue Contracts -->
+            <div class="o_rental_panel">
+                <div class="o_panel_title o_panel_danger">
+                    <i class="fa fa-exclamation-circle"/> Overdue Contracts
+                    <t t-if="data.overdue_contracts.length > 0">
+                        <span class="o_panel_count o_count_danger"><t t-esc="data.overdue_contracts.length"/></span>
+                    </t>
+                </div>
+                <div class="o_panel_body">
+                    <t t-if="data.overdue_contracts.length === 0">
+                        <div class="o_empty_state">No overdue contracts</div>
+                    </t>
+                    <t t-if="data.overdue_contracts.length > 0">
+                        <table class="o_rental_table">
+                            <thead>
+                                <tr>
+                                    <th>Contract</th>
+                                    <th>Customer</th>
+                                    <th>End Date</th>
+                                    <th>Items</th>
+                                    <th>Overdue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.overdue_contracts" t-as="rc">
+                                    <tr class="o_dashboard_record o_row_danger"
+                                        t-att-data-model="'rental.contract'"
+                                        t-att-data-id="rc.id">
+                                        <td class="o_ref_col"><t t-esc="rc.name"/></td>
+                                        <td><t t-esc="rc.partner"/></td>
+                                        <td><t t-esc="rc.end_date"/></td>
+                                        <td class="text-center"><t t-esc="rc.items"/></td>
+                                        <td>
+                                            <span class="o_days_badge o_badge_danger">
+                                                <t t-esc="rc.days_overdue"/>d overdue
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
+            </div>
+
+            <!-- RIGHT: Expiring Contracts -->
+            <div class="o_rental_panel">
+                <div class="o_panel_title o_panel_warning">
+                    <i class="fa fa-clock-o"/> Expiring Contracts (&lt; 30 Days)
+                    <t t-if="data.expiring_contracts.length > 0">
+                        <span class="o_panel_count o_count_warning"><t t-esc="data.expiring_contracts.length"/></span>
+                    </t>
+                </div>
+                <div class="o_panel_body">
+                    <t t-if="data.expiring_contracts.length === 0">
+                        <div class="o_empty_state">No contracts expiring soon</div>
+                    </t>
+                    <t t-if="data.expiring_contracts.length > 0">
+                        <table class="o_rental_table">
+                            <thead>
+                                <tr>
+                                    <th>Contract</th>
+                                    <th>Customer</th>
+                                    <th>End Date</th>
+                                    <th>Days Left</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.expiring_contracts" t-as="rc">
+                                    <tr class="o_dashboard_record"
+                                        t-att-data-model="'rental.contract'"
+                                        t-att-data-id="rc.id">
+                                        <td class="o_ref_col"><t t-esc="rc.name"/></td>
+                                        <td><t t-esc="rc.partner"/></td>
+                                        <td><t t-esc="rc.end_date"/></td>
+                                        <td>
+                                            <span t-attf-class="o_days_badge #{rc.days_left &lt;= 7 ? 'o_badge_danger' : rc.days_left &lt;= 14 ? 'o_badge_warning' : 'o_badge_info'}">
+                                                <t t-esc="rc.days_left"/>d left
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== RECENT ORDERS + SCHEDULE ====== -->
+        <div class="o_rental_grid_row">
+
+            <!-- LEFT: Recent Rental Orders -->
+            <div class="o_rental_panel">
+                <div class="o_panel_title">
+                    <i class="fa fa-list-alt"/> Recent Rental Orders
+                </div>
+                <div class="o_panel_body">
+                    <t t-if="data.recent_orders.length === 0">
+                        <div class="o_empty_state">No rental orders yet</div>
+                    </t>
+                    <t t-if="data.recent_orders.length > 0">
+                        <table class="o_rental_table">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.recent_orders" t-as="ro">
+                                    <tr class="o_dashboard_record"
+                                        t-att-data-model="'gdi.rental.order'"
+                                        t-att-data-id="ro.id">
+                                        <td class="o_ref_col"><t t-esc="ro.name"/></td>
+                                        <td><t t-esc="ro.partner"/></td>
+                                        <td class="text-center"><t t-esc="ro.line_count"/></td>
+                                        <td>
+                                            <span t-attf-class="o_state_badge o_state_#{ro.state}">
+                                                <t t-esc="ro.state_label"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
+            </div>
+
+            <!-- RIGHT: Pending Deliveries (RDO not yet done) -->
+            <div class="o_rental_panel">
+                <div class="o_panel_title">
+                    <i class="fa fa-truck"/> Pending Delivery Orders
+                    <t t-if="data.pending_deliveries.length > 0">
+                        <span class="o_panel_count o_count_info"><t t-esc="data.pending_deliveries.length"/></span>
+                    </t>
+                </div>
+                <div class="o_panel_body">
+                    <t t-if="data.pending_deliveries.length === 0">
+                        <div class="o_empty_state">No pending delivery orders</div>
+                    </t>
+                    <t t-if="data.pending_deliveries.length > 0">
+                        <table class="o_rental_table">
+                            <thead>
+                                <tr>
+                                    <th>DO</th>
+                                    <th>RO</th>
+                                    <th>Customer</th>
+                                    <th>Scheduled</th>
+                                    <th>Items</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.pending_deliveries" t-as="do_rec">
+                                    <tr class="o_dashboard_record"
+                                        t-att-data-model="'stock.picking'"
+                                        t-att-data-id="do_rec.id"
+                                        t-attf-class="o_dashboard_record #{do_rec.days_until &lt;= 0 ? 'o_row_danger' : ''}">
+                                        <td class="o_ref_col"><t t-esc="do_rec.name"/></td>
+                                        <td><t t-esc="do_rec.ro_name"/></td>
+                                        <td><t t-esc="do_rec.partner"/></td>
+                                        <td><t t-esc="do_rec.scheduled_date"/></td>
+                                        <td class="text-center"><t t-esc="do_rec.items"/></td>
+                                        <td>
+                                            <span t-attf-class="o_state_badge o_state_do_#{do_rec.state}">
+                                                <t t-esc="do_rec.state_label"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
+            </div>
+        </div>
+
+    </t>
+
+</templates>

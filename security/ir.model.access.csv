@@ -16,3 +16,5 @@ access_gdi_rental_quotation_all,gdi.rental.quotation all,model_gdi_rental_quotat
 access_gdi_rental_quotation_line_all,gdi.rental.quotation.line all,model_gdi_rental_quotation_line,,1,1,1,1
 access_gdi_rental_set_all,gdi.rental.set all,model_gdi_rental_set,,1,1,1,1
 access_gdi_rental_set_line_all,gdi.rental.set.line all,model_gdi_rental_set_line,,1,1,1,1
+access_rental_component_replacement_all,rental.component.replacement all,model_rental_component_replacement,,1,1,1,1
+access_rental_component_replacement_wizard_all,rental.component.replacement.wizard all,model_rental_component_replacement_wizard,,1,1,1,1

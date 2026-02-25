@@ -57,31 +57,28 @@ class GdiRentalOrder(models.Model):
     create_date = fields.Datetime(
         string='Creation Date', readonly=True, index=True)
     start_date = fields.Date(
-        string='Start Date', default=fields.Date.today, required=True)
+        string='Start Date',
+        compute='_compute_rental_dates', store=True, readonly=False)
     end_date = fields.Date(
-        string='Initial End Date', compute='_compute_end_date', store=True)
+        string='End Date',
+        compute='_compute_rental_dates', store=True, readonly=False)
+    rental_duration = fields.Float(
+        string='Duration (Months)',
+        compute='_compute_rental_duration', store=True, readonly=False)
     hireoff_date = fields.Date(string='Hire-off Date', readonly=True)
     effective_end_date = fields.Date(string='Effective End Date')
 
+    # Backward compatibility for contracts
     duration = fields.Integer(
-        string='Duration', default=1, required=True,
-        compute='_compute_duration_from_lines',
-        inverse='_inverse_duration', store=True)
+        string='Duration', compute='_compute_duration_compat', store=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
         ('week', 'Weeks'),
         ('month', 'Months'),
-    ], string='Unit', required=True, default='month',
-        compute='_compute_duration_from_lines',
-        inverse='_inverse_duration', store=True)
+    ], string='Unit', default='month')
     duration_string = fields.Char(
         string='Duration Str', compute='_compute_duration_str')
-
-    date_definition_level = fields.Selection([
-        ('order', 'Rental Order Level'),
-        ('item', 'Rental Order Item Level'),
-    ], string='Date Definition Level', default='order', required=True)
 
     # --- Company / Currency ---
     company_id = fields.Many2one(
@@ -134,7 +131,7 @@ class GdiRentalOrder(models.Model):
 
     # --- Links ---
     quotation_id = fields.Many2one(
-        'rental.quotation', string='Quotation', readonly=True)
+        'gdi.rental.quotation', string='Quotation', readonly=True)
     contract_id = fields.Many2one(
         'rental.contract', string='Active Contract')
     rental_contract_ids = fields.One2many(
@@ -167,46 +164,38 @@ class GdiRentalOrder(models.Model):
             order.amount_tax = tax
             order.amount_total = untaxed + tax
 
-    @api.depends('start_date', 'duration', 'duration_unit')
-    def _compute_end_date(self):
-        delta_map = {
-            'hour': lambda d: relativedelta(hours=d),
-            'day': lambda d: relativedelta(days=d),
-            'week': lambda d: relativedelta(weeks=d),
-            'month': lambda d: relativedelta(months=d),
-        }
+    @api.depends('order_line.start_date', 'order_line.end_date')
+    def _compute_rental_dates(self):
         for rec in self:
-            if not rec.start_date or not rec.duration_unit:
-                rec.end_date = False
-                continue
-            delta_fn = delta_map.get(rec.duration_unit)
-            rec.end_date = rec.start_date + delta_fn(rec.duration) if delta_fn else False
+            dates_start = rec.order_line.mapped('start_date')
+            dates_end = rec.order_line.mapped('end_date')
+            valid_starts = [d for d in dates_start if d]
+            valid_ends = [d for d in dates_end if d]
+            if valid_starts:
+                rec.start_date = min(valid_starts)
+            if valid_ends:
+                rec.end_date = max(valid_ends)
 
-    @api.depends('order_line', 'order_line.duration', 'order_line.duration_unit')
-    def _compute_duration_from_lines(self):
+    @api.depends('start_date', 'end_date')
+    def _compute_rental_duration(self):
         for rec in self:
-            if not rec.order_line:
-                continue
-            longest_days = 0
-            best_duration = rec.duration or 1
-            best_unit = rec.duration_unit or 'month'
-            for line in rec.order_line:
-                line_days = self._to_days(line.duration, line.duration_unit)
-                if line_days > longest_days:
-                    longest_days = line_days
-                    best_duration = line.duration
-                    best_unit = line.duration_unit
-            rec.duration = best_duration
-            rec.duration_unit = best_unit
+            if rec.start_date and rec.end_date:
+                delta = relativedelta(rec.end_date, rec.start_date)
+                rec.rental_duration = (
+                    (delta.years * 12) + delta.months + (delta.days / 30.0))
+            else:
+                rec.rental_duration = 0.0
 
-    def _inverse_duration(self):
-        pass  # Allow direct edits
+    @api.depends('rental_duration')
+    def _compute_duration_compat(self):
+        """Backward compat: Integer duration for contracts."""
+        for rec in self:
+            rec.duration = max(1, round(rec.rental_duration or 1))
 
-    @api.depends('duration', 'duration_unit')
+    @api.depends('rental_duration')
     def _compute_duration_str(self):
-        labels = dict(self._fields['duration_unit'].selection)
         for rec in self:
-            rec.duration_string = f"{rec.duration} {labels.get(rec.duration_unit, '')}"
+            rec.duration_string = f"{rec.rental_duration:.1f} Month(s)"
 
     @api.depends('order_line.tax_id', 'order_line.price_unit',
                  'amount_total', 'amount_untaxed')
@@ -248,16 +237,6 @@ class GdiRentalOrder(models.Model):
         today = fields.Date.today()
         for rec in self:
             rec.is_expired = bool(rec.end_date and rec.end_date < today)
-
-    # -------------------------------------------------------------------------
-    # HELPERS
-    # -------------------------------------------------------------------------
-
-    @staticmethod
-    def _to_days(duration, unit):
-        """Convert duration to approximate days for comparison."""
-        multipliers = {'hour': 1 / 24, 'day': 1, 'week': 7, 'month': 30}
-        return duration * multipliers.get(unit, 0)
 
     # -------------------------------------------------------------------------
     # CRUD
@@ -439,10 +418,9 @@ class GdiRentalOrder(models.Model):
             'partner_id': self.partner_id.id,
             'customer_reference': self.customer_reference or '',
             'customer_po_number': self.customer_po_number or '',
-            'duration': self.duration or 1,
-            'duration_unit': self.duration_unit or 'month',
             'start_date': self.start_date or False,
             'end_date': self.end_date or False,
+            'duration_unit': self.duration_unit or 'month',
             'pricelist_id': self.pricelist_id.id,
             'fiscal_position_id': self.fiscal_position_id.id,
         }
@@ -459,8 +437,9 @@ class GdiRentalOrder(models.Model):
             'product_uom_txt': line.product_uom_txt or '',
             'price_unit': line.price_unit,
             'tax_id': line.tax_id.ids or False,
-            'duration': line.duration,
-            'duration_unit': line.duration_unit,
+            'start_date': line.start_date or False,
+            'end_date': line.end_date or False,
+            'duration_unit': line.duration_unit or 'month',
         }
         if line.item_type == 'set' and line.component_line_ids:
             vals['component_line_ids'] = [

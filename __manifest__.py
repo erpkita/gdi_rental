@@ -34,6 +34,7 @@
         'report/rental_reports.xml',
         'wizard/views/rental_contract_creation_wizard_views.xml',
         'wizard/views/rental_item_hireoff_wizard_views.xml',
+        'wizard/views/rental_component_replacement_wizard_views.xml',
         'views/product_views.xml',
         'views/rental_quotation_views.xml',
         'views/gdi_rental_set_views.xml',
@@ -43,6 +44,16 @@
         'views/gdi_rental_quotation_views.xml',
         'views/menu_views.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'gdi_rental/static/src/js/rental_set_widget.js',
+            'gdi_rental/static/src/js/rental_dashboard.js',
+            'gdi_rental/static/src/scss/rental_dashboard.scss',
+        ],
+        'web.assets_qweb': [
+            'gdi_rental/static/src/xml/rental_dashboard.xml',
+        ],
+    },
     'license': 'LGPL-3',
     'installable': True,
     'auto_install': False,

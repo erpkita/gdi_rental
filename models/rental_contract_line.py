@@ -46,24 +46,22 @@ class RentalContractLine(models.Model):
     order_partner_id = fields.Many2one(related='contract_id.partner_id', store=True, string='Customer', index=True)
     
     item_type = fields.Selection([('unit', 'Unit'), ('set', 'Set')], related="ro_line_id.item_type", default='unit', string="Type", required=True)
-    start_date = fields.Date(string="Start Date", required=False)
-    end_date = fields.Date(string="End Date", compute='_compute_end_date', required=False)
-
-    duration = fields.Integer(string="Duration", required=True)
+    # --- Rental Period ---
+    start_date = fields.Date(string='Start Date')
+    end_date = fields.Date(string='End Date')
+    duration = fields.Float(
+        string='Duration (Months)',
+        compute='_compute_duration', store=True)
     duration_unit = fields.Selection([
         ('hour', 'Hours'),
         ('day', 'Days'),
-        ('week', 'weeks'),
-        ('month', 'Months')
-    ], string="Unit", required=True)
-
-    duration_string = fields.Char(string="Duration Str", compute='_compute_duration_string')
+        ('week', 'Weeks'),
+        ('month', 'Months'),
+    ], string='Unit', default='month')
+    duration_string = fields.Char(
+        string='Duration Str', compute='_compute_duration_string')
 
     discount = fields.Float(string='Discount (%)', digits='Discount', default=0.0)
-    date_definition_level = fields.Selection(
-        related="contract_id.date_definition_level", string="Date Definition Level",
-       help="Indicates whether the start and end dates are defined at the rental order level or at the rental order item level."
-    )
 
     component_line_ids = fields.One2many("rental.contract.component", 
                                          "contract_line_id", 
@@ -322,33 +320,27 @@ class RentalContractLine(models.Model):
             order = self.env["rental.contract"].browse(contract_id)
             if order:
                 res.update({
-                    "duration": order.duration,
-                    "duration_unit": order.duration_unit,
-                    "start_date": order.start_date
+                    "start_date": order.start_date,
+                    "end_date": order.end_date,
                 })
         
         return res
     
-    @api.depends('duration', 'duration_unit')
+    @api.depends('start_date', 'end_date')
+    def _compute_duration(self):
+        for line in self:
+            if line.start_date and line.end_date:
+                delta = relativedelta(line.end_date, line.start_date)
+                line.duration = (
+                    (delta.years * 12) + delta.months
+                    + (delta.days / 30.0))
+            else:
+                line.duration = 0.0
+
+    @api.depends('duration')
     def _compute_duration_string(self):
-        for record in self:
-            record.duration_string = f"{record.duration} {dict(self._fields['duration_unit'].selection).get(record.duration_unit)}"
-    
-    @api.depends('start_date', 'duration', 'duration_unit')
-    def _compute_end_date(self):
-        for record in self:
-            if not record.start_date:
-                record.end_date = False
-                continue
-                
-            if record.duration_unit == 'hour':
-                record.end_date = record.start_date + relativedelta(hours=record.duration)
-            elif record.duration_unit == 'day':
-                record.end_date = record.start_date + relativedelta(days=record.duration)
-            elif record.duration_unit == 'week':
-                record.end_date = record.start_date + relativedelta(weeks=record.duration)
-            elif record.duration_unit == 'month':
-                record.end_date = record.start_date + relativedelta(months=record.duration)
+        for line in self:
+            line.duration_string = f"{line.duration:.1f} Month(s)"
     
     @api.depends('product_uom_qty', 'discount', 'price_unit', 'tax_id')
     def _compute_amount(self):
@@ -369,9 +361,17 @@ class RentalContractLine(models.Model):
         self._update_description()
         self._update_taxes()
 
-    @api.onchange('duration_unit', 'duration')
-    def onchange_duration(self):
-        self._update_taxes()
+    @api.onchange('start_date', 'end_date')
+    def _onchange_dates(self):
+        """Recalculate price when dates change."""
+        if self.product_id and self.start_date and self.end_date:
+            self._update_taxes()
+
+    @api.onchange('contract_id')
+    def _onchange_contract_id(self):
+        if self.contract_id:
+            self.start_date = self.contract_id.start_date
+            self.end_date = self.contract_id.end_date
 
     def _update_description(self):
         if not self.product_id:
@@ -408,19 +408,31 @@ class RentalContractLine(models.Model):
         )
 
         if self.contract_id.pricelist_id and self.contract_id.partner_id:
-            rental_pricing_list = self._get_rental_pricing_list(product)
-            if not rental_pricing_list:
-                raise ValidationError(
-                    "Rental price for the selected duration (%s) is not configured for this product. Please contact the administrator or choose different duration." % (self.duration_unit)
-                )
-            rental_pricing_keys = rental_pricing_list.keys()
-            if self.duration_unit not in rental_pricing_keys:
-                readable_units = ", ".join(rental_pricing_keys)
-                raise ValidationError(
-                    f"This product is not available for rental by {self.duration_unit}. "
-                    f"Please choose from the available options: {readable_units}."
-                )            
-            rental_price = rental_pricing_list[self.duration_unit] * self.duration
+            pricing = self._get_rental_pricing_list(product)
+            if not pricing:
+                vals['price_unit'] = product.lst_price
+                self.update(vals)
+                return
+
+            # Compute duration in months from dates
+            duration_months = 1.0
+            if self.start_date and self.end_date:
+                delta = relativedelta(self.end_date, self.start_date)
+                duration_months = max(
+                    1.0,
+                    (delta.years * 12) + delta.months + (delta.days / 30.0))
+
+            # Find best pricing match (prefer 'month')
+            if 'month' in pricing:
+                rental_price = pricing['month'] * duration_months
+            elif 'week' in pricing:
+                rental_price = pricing['week'] * (duration_months * 4.33)
+            elif 'day' in pricing:
+                rental_price = pricing['day'] * (duration_months * 30)
+            else:
+                first_unit = list(pricing.keys())[0]
+                rental_price = pricing[first_unit]
+
             vals['price_unit'] = product._get_tax_included_unit_price(
                 self.company_id,
                 self.contract_id.currency_id,

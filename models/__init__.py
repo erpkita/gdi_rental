@@ -10,3 +10,5 @@ from . import rental_contract_line
 from . import rental_delivery_order
 from . import rental_quotation_new
 from . import rental_set
+from . import rental_component_replacement
+from . import rental_dashboard

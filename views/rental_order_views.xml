@@ -1,23 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL ORDER: TREE VIEW                                        -->
+    <!-- ================================================================== -->
+
     <record id="view_gdi_rental_order_tree" model="ir.ui.view">
         <field name="name">view.gdi.rental.order.tree</field>
         <field name="model">gdi.rental.order</field>
         <field name="arch" type="xml">
-            <tree decoration-muted="state in ['hireoff']" 
-                  decoration-info="state in ['confirm']" 
-                  decoration-danger="state == 'cancel'" 
-                  decoration-success="state == 'ongoing'"> 
+            <tree decoration-muted="state in ['hireoff']"
+                  decoration-info="state in ['confirm']"
+                  decoration-danger="state == 'cancel'"
+                  decoration-success="state == 'ongoing'">
                 <field name="name"/>
                 <field name="date_order"/>
                 <field name="partner_id"/>
-                <field name="user_id"/>
-                <field name="amount_total"/>
+                <field name="user_id" optional="show"/>
+                <field name="customer_reference" optional="show"/>
+                <field name="customer_po_number" optional="hide"/>
+                <field name="amount_total" sum="Total" widget="monetary"/>
+                <field name="currency_id" invisible="1"/>
                 <field name="state"/>
             </tree>
         </field>
     </record>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL ORDER: FORM VIEW                                        -->
+    <!-- ================================================================== -->
 
     <record id="view_gdi_rental_order_form" model="ir.ui.view">
         <field name="name">view.gdi.rental.order.form</field>
@@ -26,539 +37,392 @@
             <form string="Rental Order" class="o_sale_order">
                 <field name="id" invisible="1"/>
                 <field name="contract_id" invisible="1"/>
+
+                <!-- ====== HEADER BUTTONS & STATUSBAR ====== -->
                 <header>
-                    <button name="action_start_rental" type="object" string="Start Rental" states="confirm" class="btn-primary" confirm="Are you absolutely sure?, Please double-check the rental period, customer details, and terms before proceeding."/>
-                    <button name="action_create_contract" type="object" string="Extend &amp; Create New Contract" states="ongoing" class="btn-success"/>
-                    <button name="action_print_order" states="confirm,ongoing" string="Print RO" type="object" class="btn-info"/>
-                    <button name="action_hireoff" 
-                            states="ongoing" 
-                            string="Hire off" 
-                            type="object" 
+                    <button name="action_start_rental" type="object"
+                            string="Start Rental" states="confirm"
+                            class="btn-primary"
+                            confirm="Are you sure? Please double-check the rental period, customer details, and terms before proceeding."/>
+                    <button name="action_create_contract" type="object"
+                            string="Extend &amp; Create New Contract"
+                            states="ongoing" class="btn-success"/>
+                    <button name="action_print_order"
+                            states="confirm,ongoing"
+                            string="Print RO" type="object"/>
+                    <button name="action_hireoff" states="ongoing"
+                            string="Hire off" type="object"
                             class="btn-danger"
                             confirm="Are you sure you want to hire-off this rental order? This will return all active rental items to inventory."/>
-                    <button name="action_cancel" states="confirm" string="cancel" type="object"/>
-                    <field name="state" widget="statusbar" statusbar_visible="confirm,ongoing,hireoff"/>
+                    <button name="action_cancel" states="confirm"
+                            string="Cancel" type="object"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="confirm,ongoing,hireoff"/>
                 </header>
+
                 <sheet>
+                    <!-- ====== TITLE AREA ====== -->
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="1"/>
                         </h1>
                     </div>
+
+                    <!-- ====== MAIN HEADER: CUSTOMER + ORDER INFO ====== -->
                     <group name="ro_header">
+                        <!-- LEFT: Customer Details -->
                         <group name="partner_details">
-                            <field name="partner_id" 
-                                   widget="res_partner_many2one" 
-                                   context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" 
+                            <field name="partner_id"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"
+                                   widget="res_partner_many2one"
+                                   context="{'res_partner_search_mode': 'customer',
+                                             'show_address': 1, 'show_vat': True}"
                                    options='{"always_reload": True}'/>
-                            <field 
-                                   name="partner_invoice_id" 
-                                   groups="sale.group_delivery_invoice_address" 
-                                   context="{'default_type':'invoice'}" 
+                            <field name="partner_invoice_id" string="Invoice Address"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"
+                                   context="{'default_type':'invoice'}"
                                    options='{"always_reload": True}'
                                    domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
-                            <field name="partner_shipping_id" 
-                                   groups="sale.group_delivery_invoice_address" 
-                                   context="{'default_type':'delivery'}" 
+                            <field name="partner_shipping_id" string="Delivery Address"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"
+                                   context="{'default_type':'delivery'}"
                                    options='{"always_reload": True}'
                                    domain="['|', ('parent_id', '=', partner_id), ('id', '=', partner_id)]"/>
-                            <field name="user_id" widget="many2one_avatar_user"/>
                         </group>
+
+                        <!-- RIGHT: Order Details -->
                         <group name="order_details">
-                            <field name="date_order" required="1"/>
-                            <label for="pricelist_id" groups="product.group_product_pricelist"/>
-                            <div groups="product.group_product_pricelist" class="o_row">
-                                <field name="pricelist_id" options="{'no_open':True,'no_create': True}"/>
-                            </div>
-                            <field name="currency_id" invisible="1"/>
-                            <field name="customer_reference"/>
-                            <field name="customer_po_number"/>
-                            <field name="company_id" 
-                                   options="{'no_create': True}" 
-                                   groups="base.group_multi_company"
-                                   invisible="1"/>
+                            <field name="date_order"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"/>
+                            <field name="customer_reference"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"/>
+                            <field name="customer_po_number"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"/>
+                            <field name="user_id" widget="many2one_avatar_user"
+                                   attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"/>
                         </group>
                     </group>
-                    <group string="Rental Schedule Overview">
 
-                        <!-- Active Schedule Group -->
-                        <group string="Active Duration">
-                            <label for="duration"/>
+                    <!-- ====== RENTAL SCHEDULE SECTION ====== -->
+                    <group name="rental_schedule" string="Rental Schedule">
+                        <group string="Period">
+                            <label for="start_date" string="Rental Period"/>
                             <div class="o_row">
-                                <field name="duration" attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
-                                <field name="duration_unit" attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
+                                <field name="start_date" class="oe_inline"
+                                       attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
+                                <i class="fa fa-long-arrow-right mx-2"
+                                   aria-label="Arrow" title="Arrow"/>
+                                <field name="end_date" class="oe_inline"
+                                       attrs="{'readonly': [('state', 'in', ['cancel', 'ongoing', 'hireoff'])]}"/>
                             </div>
-                            <field name="effective_end_date" string="Effective End Date" readonly="1" attrs="{'invisible': [('contract_id', '=', False)]}"/>
-                            <div class="alert-secondary" colspan="2" role="alert" style="margin-bottom: 8px;">
-                                <strong>Info:</strong> This duration is based on the item with the longest rental period among the selected items.
-                            </div>
+                            <field name="rental_duration" string="Duration (Months)"
+                                   readonly="1"/>
                         </group>
-                        
-                        <!-- Initial Schedule Group -->
-                        <group string="Initial Schedule">
-                            <field name="start_date" string="Start Date" attrs="{'readonly': [('contract_id', '!=', False)]}"/>
-                            <field name="end_date" string="Initial End Date" readonly="1"/>
+                        <group string="Status">
+                            <field name="effective_end_date" string="Effective End Date"
+                                   readonly="1"
+                                   attrs="{'invisible': [('contract_id', '=', False)]}"/>
+                            <field name="duration" invisible="1"/>
+                            <field name="duration_unit" invisible="1"/>
                         </group>
-
-                        <!-- Shortcut to Contract
-                        <group string="Contract" attrs="{'invisible': [('contract_id', '=', False)]}">
-                            <button name="open_related_contract"
-                                    type="object"
-                                    icon="fa-file-text-o"
-                                    string="View Contract"
-                                    class="btn btn-primary"/>
-                        </group>
-
-                        <group></group> -->
-
                     </group>
+
+                    <!-- ====== MAIN NOTEBOOK ====== -->
                     <notebook>
+
+                        <!-- ====== TAB 1: ORDER LINES ====== -->
                         <page string="Order Lines" name="order_lines">
-                            <field name="order_line" 
-                                   context="{
-                                        'default_order_id': id,
-                                   }"
-                                   widget="section_and_note_one2many"
+                            <field name="order_line"
+                                   context="{'default_order_id': id}"
                                    attrs="{'readonly': [('state', 'in', ('ongoing', 'hireoff', 'cancel'))]}">
-                                <tree
-                                    string="Rental Order Lines"
-                                    decoration-muted="rental_state == 'hireoff'" decoration-success="rental_state == 'active'"
-                                >
-                                    <control>
-                                        <create name="add_product_control" string="Add a product"/>
-                                    </control>
 
-                                    <!-- Hidden fields for forecast widget -->
-                                    <field name="product_type" invisible="1"/>
-                                    <field name="virtual_available_at_date" invisible="1"/>
-                                    <field name="qty_available_today" invisible="1"/>
-                                    <field name="free_qty_today" invisible="1"/>
-                                    <field name="scheduled_date" invisible="1"/>
-                                    <field name="forecast_expected_date" invisible="1"/>
-                                    <field name="warehouse_id" invisible="1"/>
-
-                                    <field name="rental_state" invisible="1"/>
-                                    <field name="sequence" widget="handle" />
-                                    <field name="product_uom_category_id" invisible="1"/>
-                                    <field name="item_type" invisible="1"/>
+                                <!-- LINE TREE (non-editable: click to open popup) -->
+                                <tree string="Rental Order Lines"
+                                      decoration-muted="rental_state == 'hireoff'"
+                                      decoration-success="rental_state == 'active'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="item_type" string="Type"/>
                                     <field name="item_code"/>
-                                    <field
-                                        name="product_id"
-                                        force_save="1"
-                                        context="{
-                                            'partner_id': parent.partner_id,
-                                            'quantity': product_uom_qty,
-                                            'pricelist': parent.pricelist_id,
-                                            'uom':product_uom,
-                                            'company_id': parent.company_id,
-                                            'default_lst_price': price_unit,
-                                            'default_description_sale': name
-                                        }"
-                                        domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
-                                        widget="product_configurator"
-                                        invisible="1"
-                                    />
-
-                                    <field name="product_template_id"
-                                      string="Product"
-                                      invisible="1"
-                                      context="{
-                                          'partner_id': parent.partner_id,
-                                          'quantity': product_uom_qty,
-                                          'pricelist': parent.pricelist_id,
-                                          'uom':product_uom,
-                                          'company_id': parent.company_id,
-                                          'default_list_price': price_unit,
-                                          'default_description_sale': name
-                                      }"
-                                      domain="[('sale_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
-                                      widget="product_configurator"/>
-                                    <field name="name" widget="section_and_note_text" required="1"/>
+                                    <field name="name" string="Description"/>
                                     <field name="duration_string" string="Duration"/>
-                                    <field name="start_date" string="From"/>
-                                    <field name="end_date" string="To"/>
-                                    <field
-                                        name="product_uom_qty"
-                                        force_save="1"
-                                        context="{
-                                            'partner_id': parent.partner_id,
-                                            'quantity': product_uom_qty,
-                                            'pricelist': parent.pricelist_id,
-                                            'uom': product_uom,
-                                            'company_id': parent.company_id
-                                        }"/>
-                                    <field name="current_stock_qty" string="Available" readonly="1" optional="show"/>
-                                    <field name="virtual_stock_qty" string="Forecast" readonly="1" optional="show"/>
-                                    <field name="stock_status" string="Status" readonly="1" optional="show"/>
-                                    <field name="stock_info_display" string="Stock Info" readonly="1" optional="hide"/>
-                                    <field
-                                        name="product_uom"
-                                        force_save="1"
-                                        string="UoM"
-                                        required="1"
-                                        context="{'company_id': parent.company_id}"
-                                        groups="uom.group_uom"
-                                        options='{"no_open": True}'
-                                        optional="show"
-                                    />
-                                    <field
-                                        name="price_unit"
-                                    />
-                                    <field
-                                        name="tax_id"
-                                        widget="many2many_tags"
-                                        options="{'no_create': True}"
-                                        domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
-                                        context="{'active_test': True}"
-                                        optional="hide"
-                                    />
-                                    <field name="discount" string="Disc.%" groups="product.group_discount_per_so_line" optional="hide" widget="product_discount"/>
-                                    <field name="price_subtotal" widget="monetary" groups="account.group_show_line_subtotals_tax_excluded"/>
-                                    <field name="price_total" widget="monetary" groups="account.group_show_line_subtotals_tax_included"/>
-                                    <field name="state" invisible="1"/>
+                                    <field name="start_date" string="From" optional="show"/>
+                                    <field name="end_date" string="To" optional="show"/>
+                                    <field name="product_uom_qty" string="Qty" force_save="1"/>
+                                    <field name="product_uom" string="UoM"
+                                           groups="uom.group_uom" optional="show"/>
+                                    <field name="price_unit"/>
+                                    <field name="discount" string="Disc.%"
+                                           groups="product.group_discount_per_so_line"
+                                           optional="hide"/>
+                                    <field name="tax_id" widget="many2many_tags"
+                                           optional="hide"
+                                           domain="[('type_tax_use','=','sale'),('company_id','=',parent.company_id)]"
+                                           options="{'no_create': True}"/>
+                                    <field name="price_subtotal" widget="monetary"
+                                           groups="account.group_show_line_subtotals_tax_excluded"
+                                           sum="Total"/>
+                                    <field name="price_total" widget="monetary"
+                                           groups="account.group_show_line_subtotals_tax_included"
+                                           sum="Total"/>
+                                    <field name="rental_state" string="Status"
+                                           widget="badge"
+                                           decoration-success="rental_state == 'active'"
+                                           decoration-muted="rental_state == 'hireoff'"
+                                           decoration-info="rental_state == 'draft'"/>
                                     <field name="currency_id" invisible="1"/>
-                                    <field name="price_tax" invisible="1"/>
                                     <field name="company_id" invisible="1"/>
-                                    <button name="action_item_hireoff" type="object" string="Hire-Off" class="btn-secondary" attrs="{'invisible': ['|', ('parent.state', '!=', 'ongoing'), ('rental_state', '!=', 'active')]}"/>
-                                </tree>
-                                <form>
-                                    <header>
-                                        <field name="rental_state" widget="statusbar" statusbar_visible="draft,active,hireoff"/>
-                                    </header>
-                                    <field name="sequence" invisible="1"/>
-                                    <field name="company_id" invisible="1"/>
-                                    <field name="product_uom_category_id" invisible="1"/>
-
-                                    <!-- Hidden fields for forecast widget -->
-                                    <field name="product_type" invisible="1"/>
-                                    <field name="virtual_available_at_date" invisible="1"/>
-                                    <field name="qty_available_today" invisible="1"/>
-                                    <field name="free_qty_today" invisible="1"/>
-                                    <field name="scheduled_date" invisible="1"/>
-                                    <field name="forecast_expected_date" invisible="1"/>
-                                    <field name="warehouse_id" invisible="1"/>
                                     <field name="state" invisible="1"/>
+                                    <button name="action_item_hireoff" type="object"
+                                            string="Hire-Off" class="btn-secondary"
+                                            attrs="{'invisible': ['|', ('parent.state', '!=', 'ongoing'), ('rental_state', '!=', 'active')]}"/>
+                                </tree>
 
-                                    <group col="4">
+                                <!-- LINE POPUP FORM -->
+                                <form string="Rental Order Line Detail">
+                                    <header>
+                                        <field name="rental_state" widget="statusbar"
+                                               statusbar_visible="draft,active,hireoff"/>
+                                    </header>
+                                    <sheet>
+                                        <!-- == SECTION 1: ITEM DEFINITION == -->
+                                        <group name="item_definition">
+                                            <group string="Item Type">
+                                                <field name="item_type"
+                                                       widget="radio"
+                                                       options="{'horizontal': true}"/>
 
-                                        <group colspan="4" name="product_info" string="Product Information">
-                                            <field name="item_type"/>
-                                            <field name="product_id"
-                                                domain="[('rent_ok', '=', True), '|', ('company_id', '=', False), ('company_id', '=', parent.company_id)]"
-                                                context="{
-                                                    'partner_id':parent.partner_id, 
-                                                    'quantity':product_uom_qty, 
-                                                    'pricelist':parent.pricelist_id, 
-                                                    'uom':product_uom, 
-                                                    'company_id': parent.company_id}"
-                                                attrs="{
-                                                    'required': [('item_type', '=', 'unit')],
-                                                    'invisible': [('item_type', '=', 'set')]
-                                                }"
-                                                force_save="1"
-                                                widget="many2one_barcode"
-                                                options="{'no_create': True, 'no_open': True}"
-                                            />
-                                            <field name="name" string="Description"/>
-                                            <field name="item_code" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
-                                        </group> 
+                                                <!-- Unit: Product Selection -->
+                                                <field name="product_id"
+                                                       attrs="{'invisible': [('item_type', '=', 'set')],
+                                                               'required': [('item_type', '=', 'unit')]}"
+                                                       domain="[('rent_ok', '=', True),
+                                                                '|', ('company_id', '=', False),
+                                                                ('company_id', '=', parent.company_id)]"
+                                                       context="{'partner_id': parent.partner_id}"
+                                                       force_save="1"
+                                                       options="{'no_create': True, 'no_open': True}"/>
 
-                                        <group name="product_period" colspan="2" string="Rental Duration">
-                                            <label for="duration"/>
-                                            <div class="o_row" name="duration_section">
-                                                <field name="duration"/>
-                                                <field name="duration_unit"/>
-                                            </div>
-                                            <label for="start_date" string="From"/>
-                                            <div class="o_row">
-                                                <field name="start_date" nolabel="1" class="oe_inline" readonly="1"/>
-                                                <i class="fa fa-long-arrow-right mx-2" aria-label="Arrow icon" title="Arrow"/>
-                                                <field name="end_date" nolabel="1" class="oe_inline" readonly="1"/>
-                                            </div>
-                                        </group>
-                                        <group colspan="2" string="Price and Quantity">
-                                            <label for="product_uom_qty"/>
-                                            <div class="o_row" name="ordered_qty">
-                                                <field name="product_uom_qty"
-                                                    force_save="1"
-                                                    context="{
-                                                    'partner_id':parent.partner_id, 
-                                                    'quantity':product_uom_qty, 
-                                                    'pricelist':parent.pricelist_id, 
-                                                    'uom':product_uom, 
-                                                    'uom_qty_change':True, 
-                                                    'company_id': parent.company_id}"/>
-                                                <field name="product_uom"
-                                                       force_save="1"  attrs="{'invisible': [('item_type', '!=', 'unit')]}"
-                                                       groups="uom.group_uom" 
-                                                       class="oe_no_button"/>
-                                                <field name="product_uom_txt" attrs="{'invisible': [('item_type', '!=', 'set')]}"/>
-                                            </div>
-                                            <field name="price_unit"/>
-                                        </group>
-
-                                        <group colspan="2" string="Taxes and Discounts">
-                                            <label for="discount" groups="product.group_discount_per_so_line"/>
-                                            <div name="discount" groups="product.group_discount_per_so_line">
-                                                <field name="discount" class="oe_inline"/> %
-                                            </div>
-                                            <field name="tax_id" 
-                                                   widget="many2many_tags" 
-                                                   options="{'no_create': True}" 
-                                                   context="{'search_view_ref': 'account.account_tax_view_search'}" 
-                                                   domain="[
-                                                        ('type_tax_use','=','sale'), 
-                                                        ('company_id','=',parent.company_id)
-                                                    ]"/>
-                                        </group>
-
-                                        <group string="Total" colspan="2">
-                                            <field name="price_subtotal"/>
-                                        </group>
-
-                                        <!-- Stock Information Section -->
-                                        <group colspan="4" string="Stock Information" attrs="{'invisible': [('product_id', '=', False)]}">
-                                            <!-- In Stock Alert -->
-                                            <div class="alert alert-success mb-3 border-start border-5 border-success" 
-                                                role="alert" 
-                                                style="background-color: #d1f2eb; border-radius: 2px; padding: 16px;"
-                                                attrs="{'invisible': [('stock_status', '!=', 'in_stock')]}">
-                                                <div class="row mt-3">
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Low Stock Alert -->
-                                            <div class="alert alert-warning mb-3 border-start border-5 border-warning" 
-                                                role="alert" 
-                                                style="background-color: #fff3cd; border-radius: 2px; padding: 16px;"
-                                                attrs="{'invisible': [('stock_status', '!=', 'low_stock')]}">
-                                                <div class="row mt-3">
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Out of Stock Alert -->
-                                            <div class="alert alert-danger mb-3 border-start border-5 border-danger" 
-                                                role="alert" 
-                                                style="background-color: #f8d7da; border-radius: 2px; padding: 16px;"
-                                                attrs="{'invisible': [('stock_status', '!=', 'out_of_stock')]}">
-                                                <div class="row mt-3">
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                        <field name="current_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                        <field name="virtual_stock_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                        <field name="product_uom_qty" nolabel="1" readonly="1" 
-                                                            style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Hidden fields for computation -->
-                                            <field name="stock_status" invisible="1"/>
-                                        </group>
-                                    </group>
-                                    <notebook>
-                                        <page string="Components" attrs="{'invisible': [('item_type', '=', 'unit')]}">
-                                            <group col="4">
-                                                <field name="component_line_ids" colspan="4" nolabel="1" attrs="{'required': [('item_type', '=', 'set')]}">
-                                                    <tree>
-                                                        <field name="product_uom_category_id" invisible="1"/>
-                                                        <field name="product_id" invisible="1"/>
-                                                        <field name="name"/>
-                                                        <field name="product_uom_qty"/>
-                                                        <field name="product_uom"/>
-                                                        <field name="price_unit"/>
-                                                        <field name="price_subtotal" sum="Total Cost"/>
-                                                    </tree>
-                                                    <form string="Add Components">
-                                                        <group>
-                                                            <field name="product_uom_category_id" invisible="1"/>
-                                                            <group colspan="4" string="Product Info">
-                                                                <field name="product_id" domain="[('rent_ok', '=', True)]" options="{'no_create': True, 'no_open': True}"/>
-                                                                <field name="name"/>
-                                                            </group>
-
-                                                            <group string="Rental Pricing and Quantity">
-                                                                <label for="duration"/>
-                                                                <div class="o_row" name="duration_section">
-                                                                    <field name="duration"/>
-                                                                    <field name="duration_unit"/>
-                                                                </div>
-                                                                <field name="price_unit"/>
-                                                                <label for="product_uom_qty"/>
-                                                                <div class="o_row" name="ordered_qty">
-                                                                    <field name="product_uom_qty"/>
-                                                                    <field name="product_uom"
-                                                                        force_save="1" 
-                                                                        groups="uom.group_uom" 
-                                                                        class="oe_no_button"/>
-                                                                </div>
-                                                            </group>
-                                                            
-                                                            <group string="Total">
-                                                                <field name="price_subtotal"/>
-                                                            </group>
-
-                                                            <!-- Stock Information Section -->
-                                                            <group colspan="2" string="Stock Information" attrs="{'invisible': [('product_id', '=', False)]}">
-                                                                <!-- In Stock Alert -->
-                                                                <div class="alert alert-success mb-3 border-start border-5 border-success" role="alert" style="background-color: #d1f2eb; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'in_stock')]}">
-                                                                    <!-- <div class="d-flex align-items-center mb-2">
-                                                                        <span style="font-size: 12px; margin-right: 10px;">✅</span>
-                                                                        <strong style="font-size: 12px; color: #0f5132;">In Stock</strong>
-                                                                    </div> -->
-                                                                    <div class="row mt-3">
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #0f5132;"/>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <!-- Low Stock Alert -->
-                                                                <div class="alert alert-warning mb-3 border-start border-5 border-warning" role="alert" style="background-color: #fff3cd; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'low_stock')]}">
-                                                                    <!-- <div class="d-flex align-items-center mb-2">
-                                                                        <span style="font-size: 12px; margin-right: 10px;">⚠️</span>
-                                                                        <strong style="font-size: 12px; color: #664d03;">Low Stock - Reorder Recommended</strong>
-                                                                    </div> -->
-                                                                    <div class="row mt-3">
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #664d03;"/>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <!-- Out of Stock Alert -->
-                                                                <div class="alert alert-danger mb-3 border-start border-5 border-danger" role="alert" style="background-color: #f8d7da; border-radius: 2px; padding: 16px;" attrs="{'invisible': [('stock_status', '!=', 'out_of_stock')]}">
-                                                                    <!-- <div class="d-flex align-items-center mb-2">
-                                                                        <span style="font-size: 12px; margin-right: 10px;">❌</span>
-                                                                        <strong style="font-size: 12px; color: #842029;">Out of Stock - Urgent Action Required</strong>
-                                                                    </div> -->
-                                                                    <div class="row mt-3">
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Available Qty</small>
-                                                                            <field name="current_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Forecast Qty</small>
-                                                                            <field name="virtual_stock_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                                        </div>
-                                                                        <div class="col-4">
-                                                                            <small class="text-muted d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Qty</small>
-                                                                            <field name="product_uom_qty" nolabel="1" readonly="1" style="font-weight: bold; font-size: 12px; color: #842029;"/>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <!-- Hidden fields for computation -->
-                                                                <field name="stock_status" invisible="1"/>
-                                                            </group>
-
-                                                            <group string="Availability Info" colspan="2">
-                                                                <field name="available_qty" invisible="1"/>
-                                                                <field name="available_src_location_ids" invisible="1"/>
-                                                                <field name="available_src_location_txt" readonly="1" string="Available Src. Loc."/>
-                                                                <field name="src_location_id" domain="[('id', 'in', available_src_location_ids)]" invisible="1"/>
-                                                                <field name="lot_id" invisible="1"/>
-                                                            </group>
-                                                        </group>
-                                                    </form>
-                                                </field>
+                                                <field name="item_code"/>
                                             </group>
-                                        </page>
-                                    </notebook>
+
+                                            <group string="Description">
+                                                <field name="name" nolabel="1"
+                                                       placeholder="Product description..."
+                                                       colspan="2"/>
+                                            </group>
+                                        </group>
+
+                                        <separator/>
+
+                                        <!-- == SECTION 2: RENTAL PERIOD == -->
+                                        <group name="period_section" string="Rental Period">
+                                            <group>
+                                                <label for="start_date" string="Period"/>
+                                                <div class="o_row">
+                                                    <field name="start_date"
+                                                           widget="daterange"
+                                                           options="{'related_end_date': 'end_date'}"
+                                                           class="oe_inline"/>
+                                                    <i class="fa fa-long-arrow-right mx-2"
+                                                       aria-label="Arrow" title="Arrow"/>
+                                                    <field name="end_date"
+                                                           widget="daterange"
+                                                           options="{'related_start_date': 'start_date'}"
+                                                           class="oe_inline"/>
+                                                </div>
+                                            </group>
+                                            <group>
+                                                <field name="duration" string="Duration (Months)"/>
+                                            </group>
+                                        </group>
+
+                                        <separator/>
+
+                                        <!-- == SECTION 3: QUANTITY & PRICING == -->
+                                        <group name="pricing_section">
+                                            <group string="Quantity &amp; Pricing">
+                                                <label for="product_uom_qty"/>
+                                                <div class="o_row">
+                                                    <field name="product_uom_qty"
+                                                           class="oe_inline" force_save="1"/>
+                                                    <field name="product_uom"
+                                                           groups="uom.group_uom"
+                                                           class="oe_inline"
+                                                           attrs="{'invisible': [('item_type', '=', 'set')]}"/>
+                                                </div>
+                                                <field name="price_unit"/>
+                                                <field name="discount"
+                                                       groups="product.group_discount_per_so_line"/>
+                                                <field name="tax_id"
+                                                       widget="many2many_tags"
+                                                       domain="[('type_tax_use', '=', 'sale'),
+                                                                ('company_id', '=', parent.company_id)]"
+                                                       options="{'no_create': True}"/>
+                                            </group>
+
+                                            <group string="Totals">
+                                                <field name="price_subtotal" widget="monetary"/>
+                                                <field name="price_tax" widget="monetary"/>
+                                                <field name="price_total" widget="monetary"/>
+                                            </group>
+                                        </group>
+
+                                        <!-- == SECTION 4: STOCK INFO (units only) == -->
+                                        <group name="stock_section"
+                                               attrs="{'invisible': [('item_type', '=', 'set')]}">
+                                            <group string="Inventory">
+                                                <field name="stock_status" widget="badge"
+                                                       decoration-success="stock_status == 'in_stock'"
+                                                       decoration-warning="stock_status == 'low_stock'"
+                                                       decoration-danger="stock_status == 'out_of_stock'"
+                                                       decoration-info="stock_status == 'no_product'"/>
+                                                <field name="warehouse_id" readonly="1"/>
+                                            </group>
+                                            <group string="Stock Quantities">
+                                                <field name="current_stock_qty" string="On Hand"/>
+                                                <field name="virtual_stock_qty" string="Forecasted"/>
+                                            </group>
+                                        </group>
+
+                                        <!-- == SECTION 5: SET COMPONENTS (sets only) == -->
+                                        <group name="components_section"
+                                               string="Set Components"
+                                               attrs="{'invisible': [('item_type', '=', 'unit')]}">
+                                            <field name="component_line_ids" nolabel="1"
+                                                   colspan="2" readonly="1">
+                                                <tree string="Components"
+                                                      create="false" delete="false" edit="false">
+                                                    <field name="product_id" string="Product"/>
+                                                    <field name="name" string="Description"/>
+                                                    <field name="lot_id" string="Serial/Lot"/>
+                                                    <field name="product_uom_qty" string="Qty"/>
+                                                    <field name="product_uom" string="UoM"
+                                                           groups="uom.group_uom"/>
+                                                    <field name="price_unit"/>
+                                                    <field name="price_subtotal" sum="Total"/>
+                                                    <field name="state" string="Status"
+                                                           widget="badge"
+                                                           decoration-success="state == 'ongoing'"
+                                                           decoration-muted="state in ('returned','replaced')"
+                                                           decoration-info="state == 'draft'"/>
+                                                    <field name="currency_id" invisible="1"/>
+                                                    <field name="product_uom_category_id" invisible="1"/>
+                                                    <button name="action_replace_component"
+                                                            type="object"
+                                                            string="Replace"
+                                                            class="btn-link"
+                                                            attrs="{'invisible': ['|',
+                                                                ('state', '!=', 'ongoing'),
+                                                                ('parent.rental_state', '!=', 'active')]}"/>
+                                                </tree>
+                                            </field>
+                                        </group>
+
+                                        <!-- == SECTION 6: REPLACEMENT HISTORY == -->
+                                        <group name="replacement_history_section"
+                                               string="Replacement History"
+                                               attrs="{'invisible': [('item_type', '=', 'unit')]}">
+                                            <field name="replacement_ids" nolabel="1"
+                                                   colspan="2" readonly="1">
+                                                <tree string="Replacements"
+                                                      create="false" delete="false" edit="false">
+                                                    <field name="name"/>
+                                                    <field name="date"/>
+                                                    <field name="product_id"/>
+                                                    <field name="old_lot_id" string="Old Serial"/>
+                                                    <field name="new_lot_id" string="New Serial"/>
+                                                    <field name="reason"/>
+                                                    <field name="old_item_destination" string="Destination"/>
+                                                    <field name="user_id"/>
+                                                    <field name="state" widget="badge"
+                                                           decoration-success="state == 'done'"
+                                                           decoration-muted="state == 'cancel'"/>
+                                                </tree>
+                                            </field>
+                                        </group>
+
+                                        <!-- Hidden Fields -->
+                                        <field name="sequence" invisible="1"/>
+                                        <field name="company_id" invisible="1"/>
+                                        <field name="currency_id" invisible="1"/>
+                                        <field name="state" invisible="1"/>
+                                        <field name="product_uom_category_id" invisible="1"/>
+                                        <field name="product_type" invisible="1"/>
+                                        <field name="duration_unit" invisible="1"/>
+                                    </sheet>
                                 </form>
+
                             </field>
+
+                            <!-- ====== TOTALS SECTION ====== -->
                             <group name="note_group" col="6" class="mt-2 mt-md-0">
                                 <group colspan="4">
-                                    <field name="note" attrs="{'readonly': [('state', 'in', ['cancel'])]}" class="oe-bordered-editor" nolabel="1" placeholder="Terms and conditions..."/>
                                 </group>
-                                <group class="oe_subtotal_footer oe_right" colspan="2" name="sale_total">
-                                    <field name="tax_totals_json" widget="account-tax-totals-field" nolabel="1" colspan="2"/>
+                                <group class="oe_subtotal_footer oe_right"
+                                       colspan="2" name="sale_total">
+                                    <field name="tax_totals_json"
+                                           widget="account-tax-totals-field"
+                                           nolabel="1" colspan="2"/>
                                 </group>
-                                <div class="oe_clear"/>
                             </group>
                         </page>
-                        <page string="Other Info" name="other_info">
+
+                        <!-- ====== TAB 2: OTHER INFORMATION ====== -->
+                        <page string="Other Information" name="other_info">
                             <group>
-                                <group string="Finance">
-                                    <field name="fiscal_position_id"/>
+                                <group string="Sales">
+                                    <label for="pricelist_id"
+                                           groups="product.group_product_pricelist"/>
+                                    <div groups="product.group_product_pricelist" class="o_row">
+                                        <field name="pricelist_id"
+                                               attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"
+                                               options="{'no_open': True, 'no_create': True}"/>
+                                    </div>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="fiscal_position_id"
+                                           attrs="{'readonly': [('state', 'in', ['ongoing', 'hireoff', 'cancel'])]}"/>
                                 </group>
                                 <group string="Reference">
-                                    <field name="quotation_id"/>
+                                    <field name="quotation_id" readonly="1"/>
+                                    <field name="company_id"
+                                           options="{'no_create': True}"
+                                           groups="base.group_multi_company"/>
                                 </group>
                             </group>
                         </page>
-                        <page string="Rental Document Logs">
-                            <h6>Contract Documents</h6>
-                            <field name="rental_contract_ids" nolabel="1" readonly="1"/>
-                            <separator/>
-                            <h6>RDO Documents</h6>
-                            <field name="rental_picking_ids" nolabel="1" readonly="1"/>
+
+                        <!-- ====== TAB 3: RENTAL DOCUMENT LOGS ====== -->
+                        <page string="Rental Documents" name="documents">
+                            <group string="Contract Documents">
+                                <field name="rental_contract_ids" nolabel="1" readonly="1"/>
+                            </group>
+                            <group string="Delivery Order Documents">
+                                <field name="rental_picking_ids" nolabel="1" readonly="1"/>
+                            </group>
                         </page>
+
+                        <!-- ====== TAB 4: TERMS & CONDITIONS ====== -->
+                        <page string="Terms &amp; Conditions" name="terms">
+                            <field name="note"
+                                   placeholder="Enter terms and conditions here..."
+                                   attrs="{'readonly': [('state', 'in', ['cancel'])]}"/>
+                        </page>
+
                     </notebook>
                 </sheet>
+
+                <!-- ====== CHATTER ====== -->
                 <div class="oe_chatter">
-                    <field name="message_follower_ids" widget="mail_followers" />
-                    <field name="message_ids" widget="mail_thread" />
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
                 </div>
             </form>
         </field>
     </record>
+
+    <!-- ================================================================== -->
+    <!-- GDI RENTAL ORDER: WINDOW ACTION                                    -->
+    <!-- ================================================================== -->
 
     <record id="action_gdi_rental_order" model="ir.actions.act_window">
         <field name="name">Rental Order</field>

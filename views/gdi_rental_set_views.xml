@@ -42,8 +42,21 @@
                                 <tree editable="bottom">
                                     <field name="product_id" domain="[('rent_ok', '=', True)]"/>
                                     <field name="quantity"/>
+                                    <field name="qty_available" string="On Hand"/>
+                                    <field name="virtual_available" string="Forecasted"/>
+                                    <field name="stock_status" string="Status"
+                                           widget="badge"
+                                           decoration-success="stock_status == 'in_stock'"
+                                           decoration-warning="stock_status == 'low_stock'"
+                                           decoration-danger="stock_status == 'out_of_stock'"
+                                           decoration-info="stock_status == 'no_product'"/>
                                 </tree>
                             </field>
+                        </page>
+                        <page string="Description">
+                            <group>
+                                <field name="description" nolabel="1" placeholder="Add a description for this set..."/>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
